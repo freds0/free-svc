@@ -1,0 +1,22 @@
+path: ./logs/${hydra.job.config_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  
+log_level: INFO
+seed: 1
+tb_log_dir: tensorboard
+tqdm: true
+
+hydra:
+  run:
+    dir: ${path} 
+  job_logging:
+    formatters:
+      colorlog:
+        format: '[%(cyan)s%(asctime)s%(reset)s][%(blue)s%(name)s:%(lineno)s:%(funcName)s()%(reset)s][%(log_color)s%(levelname)s%(reset)s]
+          - %(message)s'
+    handlers:
+      file:
+        filename: ${hydra.run.dir}/${hydra.job.name}_${now:%Y-%m-%d}_${now:%H-%M-%S}.log  
+
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
