@@ -14,3 +14,9 @@ matplotlib==3.7.1
 transformers==4.28.1
 # pyreaper @ git+https://github.com/r9y9/pyreaper.git@v0.0.9#egg=pyreaper
 huggingface_hub
+nnAudio
+numpy==1.24
+gdown
+torchaudio==2.1.2
+torch==2.1.2
+asteroid_filterbanks
