@@ -1,0 +1,45 @@
+model:
+  class_path: singer_identity.trainer.SSLTrainer
+  init_args:
+# ------------------ Feature extractor ------------------
+    feature_extractor:
+      spec_layer: 'melspectogram'
+      n_fft: 2048
+      hop_length: 512
+# ------------------ Encoder ------------------
+    backbone:
+      backbone: "efficientnet_b0"
+      pretrained: true
+      embedding_dim: 1000
+# ------------------ Projection ------------------       
+    projection:
+      input_dim: 1000
+      output_dim: 128
+      l2_normalize: true
+# ------------------ Training hyperparameters ------------------       
+    use_contrastive_loss: false 
+    # temp: 0.2
+    # nr_negative: 250
+    # decouple: true
+    use_invariance_loss: true
+    fact_inv_loss:  25
+    use_covariance_reg: true
+    fact_cov: 100
+    use_variance_reg: true
+    fact_var: 25
+    gamma: 1
+    use_align_loss: false
+    use_uniform_loss: false
+    # ------------------ Optimizer ------------------
+    optimizer1_init:
+      class_path: torch.optim.Adam
+      init_args:
+        lr: 0.0001
+        weight_decay: 1e-5
+trainer:
+# ------------------ Logger ------------------
+  logger:
+    class_path: pytorch_lightning.loggers.TensorBoardLogger
+    init_args:
+      save_dir: "logs"
+      name: "vicreg"

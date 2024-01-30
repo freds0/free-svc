@@ -1,36 +1,6 @@
 defaults:
 - common
 
-spk_encoder_ckpt: models/speaker_encoder/ckpt/pretrained_bak_5805000.pt
-ssl_encoder_type: hubert
-ssl_encoder_ckpt: lengyue233/content-vec-best
-post_ssl_encoder_type: vits-encoder-with-uv-emb
-# ssl_encoder_type: wavlm
-# ssl_encoder_ckpt: models/wavlm/WavLM-Large.pt
-# post_ssl_encoder_type: freevc-bottleneck
-coarse_f0: true
-cond_f0_on_flow: false
-
-data: 
-  dataset_dir: dataset_nus
-  filter_length: 1280
-  hop_length: 320
-  max_wav_value: 32768.0
-  mel_fmax: null
-  mel_fmin: 0.0
-  n_mel_channels: 80
-  num_workers: 16
-  pitch_features_dir: null
-  #pitch_features_dir: ${data.dataset_dir}/pitch_features
-  sampling_rate: 16000
-  spectrogram_dir: ${data.dataset_dir}/spectrograms
-  spk_embeddings_dir: ${data.dataset_dir}/spk_embeddings
-  sr_min_max: [68, 92]
-  ssl_feature_dir: null
-  training_files: ${data.dataset_dir}/val.csv
-  validation_files: ${data.dataset_dir}/val.csv
-  win_length: 1280
-
 train:
   batch_size: 42
   betas: [0.8, 0.99]
@@ -60,6 +30,29 @@ train:
   warmup_epochs: 0
   weighted_batch_speaker_sampling : true
 
+data: 
+  dataset_dir: dataset_nus
+  filter_length: 1280
+  hop_length: 320
+  max_wav_value: 32768.0
+  mel_fmax: null
+  mel_fmin: 0.0
+  n_mel_channels: 80
+  num_workers: 4
+  pitch_features_dir: null
+  sampling_rate: 16000
+  spectrogram_dir: ${data.dataset_dir}/spectrograms
+  spk_embeddings_dir: ${data.dataset_dir}/spk_embeddings
+  sr_min_max: [68, 92]
+  ssl_feature_dir: null
+  training_files: ${data.dataset_dir}/val.csv
+  validation_files: ${data.dataset_dir}/val.csv
+  win_length: 1280
+  use_spk_emb: false
+  spk_encoder_type: null # compute on forward (model) | ECAPA2SpeakerEncoder16k
+  ssl_encoder_type: null # compute on forward (model) | hubert
+  ssl_encoder_ckpt: null # compute on forward (model) | lengyue233/content-vec-best
+
 model: 
   save_dir: null
   filter_channels: 768
@@ -78,9 +71,15 @@ model:
   resblock_kernel_sizes: [3,7,11]
   resblock: 1
   ssl_dim: 768
-  # ssl_dim: 1024
   upsample_initial_channel: 512
   upsample_kernel_sizes: [16,16,4,4]
   upsample_rates: [10,8,2,2]
   use_spectral_norm: false
-  use_spk: false
+  use_spk_emb: true
+  freeze_external_spk: true
+  spk_encoder_type: ECAPA2SpeakerEncoder16k
+  ssl_encoder_type: hubert # or wavlm
+  ssl_encoder_ckpt: lengyue233/content-vec-best # or models/wavlm/WavLM-Large.pt
+  post_ssl_encoder_type: vits-encoder-with-uv-emb # or freevc-bottleneck
+  coarse_f0: true
+  cond_f0_on_flow: false

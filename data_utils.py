@@ -313,7 +313,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         self.spk_embeddings_dir = config.data.spk_embeddings_dir
         self.sr_min_max = config.data.sr_min_max
         self.ssl_feature_dir = config.data.ssl_feature_dir
-        self.use_spk = config.model.use_spk
+        self.use_spk_emb = config.data.use_spk_emb
         self.use_sr = config.train.use_sr
         self.win_length = config.data.win_length
 
@@ -322,21 +322,10 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
                 f"Creating spectrogram directory {self.spectrogram_dir}")
             os.makedirs(self.spectrogram_dir, exist_ok=True)
 
-        if self.use_spk and not self.spk_embeddings_dir:
-            warn("Online speaker embedding is deprecated and will be removed.", DeprecationWarning, stacklevel=2)
-            self.logger.info("use_spk is True but spk_embeddings_dir is None. Will compute speaker embeddings during training.")
-            from models.speaker_encoder.voice_encoder import SpeakerEncoder
-            from models.speaker_encoder.audio import preprocess_wav
-            self.logger.info(
-                "Loading Speaker Encoder for speaker embedding...")
-            self.speaker_encoder_preprocess = preprocess_wav
-            self.speaker_encoder = SpeakerEncoder(config.spk_encoder_ckpt)
-            self.logger.info("Loaded Speaker Encoder.")
-
         if self.pitch_features_dir is None:
             self.logger.info("pitch_features_dir is None. Will compute pitch features during training.")
             self.logger.info(
-                "Loading Pitch Predictor (PyReaper) for pitch features...")
+                "Loading Pitch Predictor for pitch features...")
             from models.f0_predictor import get_f0_predictor
 
             self.pitch_predictor = get_f0_predictor(
@@ -415,8 +404,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
             self.logger.debug(f"Loaded spk.shape: {spk.shape}")
 
         else:
-            spk = self.speaker_encoder.embed_utterance(
-                self.speaker_encoder_preprocess(audio_path))
+            return None # Speaker embedding extraction was removed and moved to the forward pass of the model
         return spk
 
     def _load_ssl_feature(self, audio_path, speaker):
@@ -497,10 +485,10 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         spec = self._load_spectrogram(audio_path, audio_norm)
         c = self._load_ssl_feature(audio_path, speaker)
         pitch = self._load_pitch(audio_path, audio_norm, speaker)
-        if self.use_spk:
+        if self.use_spk_emb:
             spk = self._load_spk_embedding(audio_path, speaker)
 
-        if self.use_spk:
+        if self.use_spk_emb:
             return [c, spec, audio_norm, pitch, spk]
         else:
             return [c, spec, audio_norm, pitch]
@@ -520,7 +508,7 @@ class FeatureAudioSpeakerCollate():
         self.logger = logger
         self.hps = config
         self.use_sr = config.train.use_sr
-        self.use_spk = config.model.use_spk
+        self.use_spk_emb = config.data.use_spk_emb
         self.dataset = dataset
 
     def __call__(self, batch_files_and_speakers):
@@ -543,7 +531,7 @@ class FeatureAudioSpeakerCollate():
         spec_lengths = torch.LongTensor(len(batch))
         wav_lengths = torch.LongTensor(len(batch))
         pitch_lengths = torch.LongTensor(len(batch))
-        if self.use_spk:
+        if self.use_spk_emb:
             spks = torch.FloatTensor(len(batch), batch[0][4].size(0))
         else:
             spks = None
@@ -573,7 +561,7 @@ class FeatureAudioSpeakerCollate():
             pitch_padded[i, :, :pitch.size(1)] = pitch
             pitch_lengths[i] = pitch.size(1)
 
-            if self.use_spk:
+            if self.use_spk_emb:
                 try:
                     spks[i] = row[4]
                 except:
@@ -594,7 +582,7 @@ class FeatureAudioSpeakerCollate():
         wav_padded = wav_padded[:, :, :-self.hps.data.hop_length]
         
         c_padded = None
-        if self.use_spk:
+        if self.use_spk_emb:
             return c_padded, spec_padded, wav_padded, pitch_padded, spks
         else:
             return c_padded, spec_padded, wav_padded, pitch_padded

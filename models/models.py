@@ -1,10 +1,18 @@
 import copy
 import math
 import torch
+import torchaudio
 from torch import nn
 from torch.nn import functional as F
 
 from models.ssl_extractors import WavLMFeatureExtractor, HubertFeatureExtractor
+from models.speaker_encoders import (
+    ByolSpeakerEncoder, 
+    CoquiSpeakerEncoder, 
+    DefaultSpeakerEncoder,
+    ECAPA2SpeakerEncoder16k, 
+    RawNet3SpeakerEncoder44k, 
+)
 
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
@@ -317,7 +325,8 @@ class SynthesizerTrn(nn.Module):
                  upsample_kernel_sizes,
                  gin_channels,
                  ssl_dim,
-                 use_spk,
+                 use_spk_emb,
+                 freeze_external_spk,
                  config=None,
                  **kwargs):
 
@@ -339,7 +348,8 @@ class SynthesizerTrn(nn.Module):
         self.segment_size = segment_size
         self.gin_channels = gin_channels
         self.ssl_dim = ssl_dim
-        self.use_spk = use_spk
+        self.use_spk_emb = use_spk_emb
+        self.freeze_external_spk = freeze_external_spk
         self.config = config
 
         self.coarse_f0 = True if "coarse_f0" in self.config and self.config.coarse_f0 else False
@@ -379,9 +389,54 @@ class SynthesizerTrn(nn.Module):
         self.flow = ResidualCouplingBlock(
             inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels, cond_pitch=self.cond_f0_on_flow, pitch_channels=1)
 
-        if not self.use_spk:
-            self.enc_spk = SpeakerEncoder(
-                model_hidden_size=gin_channels, model_embedding_size=gin_channels)
+        if self.use_spk_emb:
+            if self.spk_encoder_model == "ByolSpeakerEncoder":
+                self.enc_spk = ByolSpeakerEncoder(self.config.device).model
+            elif self.spk_encoder_model == "CoquiSpeakerEncoder":
+                self.enc_spk = CoquiSpeakerEncoder(self.config.device).model
+            elif self.spk_encoder_model == "DefaultSpeakerEncoder":
+                self.enc_spk = DefaultSpeakerEncoder(self.config.device).model
+            elif self.spk_encoder_model == "ECAPA2SpeakerEncoder16k":
+                self.enc_spk = ECAPA2SpeakerEncoder16k(self.config.device).model
+            elif self.spk_encoder_model == "RawNet3SpeakerEncoder44k":
+                self.enc_spk = RawNet3SpeakerEncoder44k(self.config.device, self.config.spk_encoder_ckpt).model
+            else:
+                raise ValueError(f"Unknown spk_encoder_model: {self.spk_encoder_model}")
+                
+            if self.freeze_external_spk:
+                for param in self.speaker_encoder.parameters():
+                    param.requires_grad = False
+
+    def get_spk_emb(self, y=None, mel=None):
+        if self.spk_encoder_model == "DefaultSpeakerEncoder":
+            assert mel is not None, "mel is None"
+            g = self.speaker_encoder(mel.transpose(1, 2))
+            g = g.unsqueeze(-1)
+        elif self.spk_encoder_model == "ByolSpeakerEncoder":
+            assert y is not None, "y is None"
+            g = self.speaker_encoder(y)
+            g = g.unsqueeze(-1)
+        elif self.spk_encoder_model == "CoquiSpeakerEncoder":
+            if self.sampling_rate != self.speaker_encoder.audio_config["sample_rate"]:
+                y_spk = torchaudio.functional.resample(
+                        y,
+                        orig_freq=self.hps.data.sampling_rate,
+                        new_freq=self.speaker_encoder.audio_config["sample_rate"],
+                        lowpass_filter_width=64,
+                        rolloff=0.9475937167399596,
+                        resampling_method="kaiser_window",
+                        beta=14.769656459379492,
+                )
+            else:
+                y_spk = y
+            g = self.speaker_encoder.forward(y_spk.contiguous(), l2_norm=True).unsqueeze(-1)
+        elif self.spk_encoder_model == "RawNet3":
+            g = self.speaker_encoder(y)
+            g = g.unsqueeze(-1)
+        elif self.spk_encoder_model == "ECAPA2SpeakerEncoder16k":
+            g = self.speaker_encoder(y)
+            g = g.unsqueeze(-1)
+
 
     def forward(self, spec, y=None, c=None, g=None, mel=None, c_lengths=None, spec_lengths=None, pitch=None):
 
@@ -405,9 +460,9 @@ class SynthesizerTrn(nn.Module):
             spec_lengths = (torch.ones(spec.size(0)) *
                             spec.size(-1)).to(spec.device)
 
-        if not self.use_spk:
-            g = self.enc_spk(mel.transpose(1, 2))
-        g = g.unsqueeze(-1)
+        if g is None:
+            g = self.get_spk_emb(y, mel)
+        assert g is not None, "g is None. Check configuration of speaker encoder model or g input on forward method"
 
         # ToDo: Implement denormalizator of pitch (F0Decoder) on https://github.com/svc-develop-team/so-vits-svc/blob/58865936d6b3e6dbca55ef2c7013bea62253431a/models.py#L369
         if self.coarse_f0:
@@ -442,9 +497,10 @@ class SynthesizerTrn(nn.Module):
 
         if c_lengths == None:
             c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
-        if not self.use_spk:
-            g = self.enc_spk.embed_utterance(mel.transpose(1, 2))
-        g = g.unsqueeze(-1)
+        
+        if g is None:
+            g = self.get_spk_emb(y, mel)
+        assert g is not None, "g is None. Check configuration of speaker encoder model or g input on forward method"
 
         if self.coarse_f0:
             pitch = f0_to_coarse(pitch).detach()

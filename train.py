@@ -194,7 +194,7 @@ class Trainer:
 
         for batch_idx, items in tqdm(enumerate(train_loader), total=len(train_loader)):
             try:
-                if self.config.model.use_spk:
+                if self.config.data.use_spk_emb:
                     c, spec, y, pitch, spk = items
                     spk = spk.cuda(rank, non_blocking=True)
                 else:
@@ -233,7 +233,7 @@ class Trainer:
         generator.eval()
         with torch.no_grad():
             for batch_idx, items in tqdm(enumerate(valid_loader)):
-                if self.config.model.use_spk:
+                if self.config.data.use_spk_emb:
                     c, spec, y, pitch, spk = items
                     g = spk[:1].cuda(0)
                 else:
@@ -474,7 +474,7 @@ class Trainer:
 
 @hydra.main(version_base=None,
             config_path="configs",
-            config_name="freesvc-online")
+            config_name="config")
 def main(cfg: DictConfig):
 
     run_dir = HydraConfig.get().run.dir
