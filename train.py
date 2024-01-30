@@ -189,8 +189,8 @@ class Trainer:
         net_g.train()
         net_d.train()
         
-        if rank==0:
-            self.evaluate(generator=net_g, valid_loader=valid_loader, writer_valid=writer_valid)
+        # if rank==0:
+        #     self.evaluate(generator=net_g, valid_loader=valid_loader, writer_valid=writer_valid)
 
         for batch_idx, items in tqdm(enumerate(train_loader), total=len(train_loader)):
             try:
@@ -371,8 +371,6 @@ class Trainer:
 
         self.logger.info("Creating models...")
         
-
-            
         net_g = SynthesizerTrn(
             self.config.data.filter_length // 2 + 1,
             self.config.train.segment_size // self.config.data.hop_length,

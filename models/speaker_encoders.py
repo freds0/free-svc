@@ -3,6 +3,7 @@ import torchaudio
 import librosa
 import logging
 
+from torch import nn
 
 from .speaker_encoder.audio import wav_to_mel_spectrogram
 from .speaker_encoder.audio import preprocess_wav as speaker_encoder_preprocess
@@ -21,9 +22,10 @@ from .clova.SpeakerNet import SpeakerNet
 from huggingface_hub import hf_hub_download
 
 
-class ECAPA2SpeakerEncoder16k:
+class ECAPA2SpeakerEncoder16k(nn.Module):
     
     def __init__(self, device, spk_encoder_ckpt='Jenthe/ECAPA2', half=False):
+        super().__init__()
         self.device = device
         model_file = hf_hub_download(repo_id=spk_encoder_ckpt, filename='ecapa2.pt', cache_dir=None)
         self.speaker_encoder = torch.jit.load(model_file, map_location=device)
@@ -42,10 +44,14 @@ class ECAPA2SpeakerEncoder16k:
     @property
     def embedding_dim(self):
         return 192
+    
+    def forward(self, x):
+        return self.speaker_encoder(x)
 
-class ByolSpeakerEncoder:
+class ByolSpeakerEncoder(nn.Module):
 
     def __init__(self, device):
+        super().__init__()
         self.device = device
         self.speaker_encoder = load_ssl_singer_identity_model("byol").to(device)
 
@@ -59,10 +65,14 @@ class ByolSpeakerEncoder:
     @property
     def embedding_dim(self):
         return 1000
+    
+    def forward(self, x):
+        return self.speaker_encoder(x)
 
-class RawNet3SpeakerEncoder44k:
+class RawNet3SpeakerEncoder44k(nn.Module):
 
     def __init__(self, device, spk_encoder_ckpt):
+        super().__init__()
         self.device = device
         self.speaker_encoder = RawNet3()
         self.speaker_encoder = SpeakerNet(RawNet3, nOut=256, encoder_type="ECA", sinc_stride=10)  # TODO: make it configurable
@@ -81,10 +91,14 @@ class RawNet3SpeakerEncoder44k:
     @property
     def embedding_dim(self):
         return 256
+    
+    def forward(self, x):
+        return self.speaker_encoder(x)
 
-class CoquiSpeakerEncoder:
+class CoquiSpeakerEncoder(nn.Module):
 
     def __init__(self, device):
+        super().__init__()
         self.device = device
         self.speaker_manager = SpeakerManager()
         self.speaker_manager.load()
@@ -115,9 +129,14 @@ class CoquiSpeakerEncoder:
     def embedding_dim(self):
         return 512
     
-class DefaultSpeakerEncoder:
+    def forward(self, x):
+        return self.speaker_encoder(x)
+    
+    
+class DefaultSpeakerEncoder(nn.Module):
 
     def __init__(self, device):
+        super().__init__()
         self.device = device
         self.speaker_encoder = SpeakerEncoder(device=device)
 
@@ -131,3 +150,6 @@ class DefaultSpeakerEncoder:
     @property
     def embedding_dim(self):
         return 256
+    
+    def forward(self, x):
+        return self.speaker_encoder(x)
