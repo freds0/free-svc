@@ -64,7 +64,7 @@ class Trainer:
             self.logger.warning("Number of workers is greater than 0. Note that online feature extraction is not currently supported.")
         self.scaler = GradScaler(enabled=config.train.fp16_run)
 
-    def _train_step(self, net_g, net_d, optim_g, optim_d, c, spec, y, pitch, spk=None, rank=0, writer=None, writer_valid=None):
+    def _train_step(self, net_g, net_d, optim_g, optim_d, c, spec, y, pitch, spk=None, lang_id=None, rank=0, writer=None, writer_valid=None):
 
         self.logger.debug(f"c: {c.shape if c else None}, spec: {spec.shape}, y: {y.shape}, pitch: {pitch.shape}, g: {spk.shape if spk is not None else None}")
         spec = spec.cuda(rank, non_blocking=True)
@@ -83,7 +83,7 @@ class Trainer:
         with autocast(enabled=self.config.train.fp16_run):
             y_hat, ids_slice, z_mask,\
                 (z, z_p, m_p, logs_p, m_q, logs_q) = net_g(
-                   spec=spec, y=y, c=c, g=spk, mel=mel, pitch=pitch
+                   spec=spec, y=y, c=c, g=spk, mel=mel, pitch=pitch, lang_id=lang_id
                 )
 
             y_mel = commons.slice_segments(
@@ -144,7 +144,7 @@ class Trainer:
                     "mel": loss_mel,
                     "kl": loss_kl
                 }
-                
+
                 info = {k: float(losses[k]) for k in losses}
                 info["epoch"] = self.epoch
                 info["step"] = self.step
@@ -195,11 +195,12 @@ class Trainer:
         for batch_idx, items in tqdm(enumerate(train_loader), total=len(train_loader)):
             try:
                 if self.config.model.use_spk:
-                    c, spec, y, pitch, spk = items
+                    c, spec, y, pitch, spk, lang_id = items
                     spk = spk.cuda(rank, non_blocking=True)
                 else:
-                    c, spec, y, pitch = items
+                    c, spec, y, pitch, lang_id = items
                     spk = None
+                lang_id = lang_id.cuda(rank, non_blocking=True)
                 self._train_step(
                     net_g=net_g,
                     net_d=net_d,
@@ -210,6 +211,7 @@ class Trainer:
                     y=y,
                     pitch=pitch,
                     spk=spk,
+                    lang_id=lang_id,
                     rank=rank,
                     writer=writer
                 )
@@ -234,15 +236,15 @@ class Trainer:
         with torch.no_grad():
             for batch_idx, items in tqdm(enumerate(valid_loader)):
                 if self.config.model.use_spk:
-                    c, spec, y, pitch, spk = items
+                    c, spec, y, pitch, spk, lang_id = items
                     g = spk[:1].cuda(0)
                 else:
-                    c, spec, y, pitch = items
+                    c, spec, y, pitch, lang_id = items
                     g = None
                 spec, y, pitch = spec[:1].cuda(0), y[:1].cuda(0), pitch[:1].cuda(0)
                 if c:
                     c = c[:1].cuda(0)
-                
+                lang_id = lang_id.cuda(0)
                 mel = mel_processing.spec_to_mel_torch(
                     spec,
                     self.config.data.filter_length,
@@ -250,8 +252,8 @@ class Trainer:
                     self.config.data.sampling_rate,
                     self.config.data.mel_fmin,
                     self.config.data.mel_fmax)
-                
-                y_hat = generator.module.infer(c=c, y=y, g=g, mel=mel, pitch=pitch)
+
+                y_hat = generator.module.infer(c=c, y=y, g=g, mel=mel, pitch=pitch, lang_id=lang_id)
 
                 y_hat_mel = mel_processing.mel_spectrogram_torch(
                     y_hat.squeeze(1).float(),
@@ -463,7 +465,7 @@ class Trainer:
                     self.save_dir, f"G_{self.epoch:05d}_{self.step:07d}.pth"))
                 utils.save_checkpoint(net_d, optim_d, self.config.train.learning_rate, self.epoch, os.path.join(
                     self.save_dir, f"D_{self.epoch:05d}_{self.step:07d}.pth"))
-                    
+
             if rank == 0:
                 self.logger.info("End of epoch {} | Time: {:.3f}s".format(
                     self.epoch, time.time() - start_time))

@@ -25,7 +25,7 @@ function downloadPopBuTFy() {
     fi
     mv PopBuTFy.zip $DATASET_DIR_NAME/
     cd $DATASET_DIR_NAME/
-    unzip PopBuTFy.zip && rm PopBuTFy.zip 
+    unzip PopBuTFy.zip && rm PopBuTFy.zip
     cd ..
 }
 
@@ -64,10 +64,11 @@ function downsample() {
 # Function to create train and test splits
 function create_splits() {
     python3 scripts/preprocess_flist.py \
-        --source-dir $DATASET_DIR_NAME/16k  \
-        --train-list $DATASET_DIR_NAME/train.csv \
-        --val-list $DATASET_DIR_NAME/val.csv \
-        --test-list $DATASET_DIR_NAME/test.csv \
+        --speaker-name-prefix "popbutfy_" \
+        --source-dir $DATASET_DIR_NAME/en  \
+        --train-list $DATASET_DIR_NAME/en_train.csv \
+        --val-list $DATASET_DIR_NAME/en_val.csv \
+        --test-list $DATASET_DIR_NAME/en_test.csv \
         --seed 1
 }
 
@@ -80,7 +81,7 @@ function extract_features() {
 
     python3 scripts/preprocess_ssl.py \
         --in-dir $DATASET_DIR_NAME/16k \
-        --out-dir $DATASET_DIR_NAME/ssl_features 
+        --out-dir $DATASET_DIR_NAME/ssl_features
 
     python3 scripts/preprocess_sr.py \
         --in-dir $DATASET_DIR_NAME/16k \
@@ -92,19 +93,18 @@ function extract_features() {
         --in-dir $DATASET_DIR_NAME/16k \
         --out-dir $DATASET_DIR_NAME/pitch_features \
         --num-workers 1
-    
 }
 
-echo "STEP 1"
-downloadPopBuTFy
-echo "STEP 2"
-create_spk_dirs
+# echo "STEP 1"
+# downloadPopBuTFy
+# echo "STEP 2"
+# create_spk_dirs
 echo "STEP 3"
-downsample
+# downsample
 echo "STEP 4"
 create_splits
-echo "STEP 5"
-extract_features
+# echo "STEP 5"
+# extract_features
 echo "DONE"
 rm -rf dataset_pop/data
 echo "" > $DATASET_DIR_NAME/DONE

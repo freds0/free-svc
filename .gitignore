@@ -4,6 +4,14 @@
 # Dataset
 dataset
 
+dataset_jvs/
+dataset_pop/
+dataset_opensinger/
+metadata/
+logs/
+*.pt
+g_02500000
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

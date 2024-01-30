@@ -410,7 +410,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
                 raise Exception(f"Speaker embedding not found at {spk_path}. "
                                 "Please run preprocess_spk.py to generate speaker embeddings "
                                 "or set spk_embeddings_dir to None (will compute during training).")
-            
+
             spk = torch.from_numpy(np.load(spk_path))
             self.logger.debug(f"Loaded spk.shape: {spk.shape}")
 
@@ -418,6 +418,11 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
             spk = self.speaker_encoder.embed_utterance(
                 self.speaker_encoder_preprocess(audio_path))
         return spk
+
+    def _load_language_id(self, audio_path):
+        language_id = audio_path.split("/")[1]
+
+        return self.config.lang_dict[language_id]
 
     def _load_ssl_feature(self, audio_path, speaker):
         if self.ssl_feature_dir is not None:
@@ -499,11 +504,14 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         pitch = self._load_pitch(audio_path, audio_norm, speaker)
         if self.use_spk:
             spk = self._load_spk_embedding(audio_path, speaker)
+        lang_id = None
+        if "cond_lang" in self.config and self.config.cond_lang:
+            lang_id = self._load_language_id(audio_path)
 
         if self.use_spk:
-            return [c, spec, audio_norm, pitch, spk]
+            return [c, spec, audio_norm, pitch, spk, lang_id]
         else:
-            return [c, spec, audio_norm, pitch]
+            return [c, spec, audio_norm, pitch, lang_id]
 
     def __getitem__(self, index):
         return self.audio_paths_and_speakers[index]
@@ -548,6 +556,9 @@ class FeatureAudioSpeakerCollate():
         else:
             spks = None
 
+        if "cond_lang" in self.hps and self.hps.cond_lang:
+            lang_ids = torch.LongTensor(len(batch))
+
         spec_padded = torch.FloatTensor(
             len(batch), batch[0][1].size(0), max_spec_len)
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
@@ -578,6 +589,17 @@ class FeatureAudioSpeakerCollate():
                     spks[i] = row[4]
                 except:
                     self.logger.error(str(spks[i]) + " " + str(row[4]))
+
+                if "cond_lang" in self.hps and self.config.cond_lang:
+                    lang_id = row[5]
+                    if lang_id is not None:
+                        lang_ids[i] = lang_id
+
+            if "cond_lang" in self.hps and self.hps.cond_lang:
+                lang_id = row[4]
+                if lang_id is not None:
+                    lang_ids[i] = lang_id
+
         spec_seglen = spec_lengths[-1] if spec_lengths[-1] < self.hps.train.max_speclen + \
             1 else self.hps.train.max_speclen + 1
         wav_seglen = spec_seglen * self.hps.data.hop_length
@@ -592,12 +614,12 @@ class FeatureAudioSpeakerCollate():
 
         spec_padded = spec_padded[:, :, :-1]
         wav_padded = wav_padded[:, :, :-self.hps.data.hop_length]
-        
+
         c_padded = None
         if self.use_spk:
-            return c_padded, spec_padded, wav_padded, pitch_padded, spks
+            return c_padded, spec_padded, wav_padded, pitch_padded, spks, lang_ids
         else:
-            return c_padded, spec_padded, wav_padded, pitch_padded
+            return c_padded, spec_padded, wav_padded, pitch_padded, lang_ids
 
 
 class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):

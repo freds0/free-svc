@@ -359,7 +359,11 @@ class TextEncoder(nn.Module):
       filter_channels=None,
       n_heads=None,
       p_dropout=None,
-      cond_f0=True):
+      cond_f0=True,
+      cond_lang=False,
+      lang_dim=0,
+      num_langs=1,
+      ):
     super().__init__()
     self.out_channels = out_channels
     self.hidden_channels = hidden_channels
@@ -374,6 +378,10 @@ class TextEncoder(nn.Module):
     else:
         self.f0_emb = None
         self.emb_uv = None
+    if cond_lang:
+        self.lang_emb = nn.Embedding(num_langs, lang_dim)
+    else:
+        self.lang_emb = None
 
     self.enc_ =  Encoder(
         hidden_channels,
@@ -383,7 +391,7 @@ class TextEncoder(nn.Module):
         kernel_size,
         p_dropout)
 
-  def forward(self, x, x_lengths, f0=None, noice_scale=1):
+  def forward(self, x, x_lengths, f0=None, lang_id=None, noice_scale=1):
     x_mask = torch.unsqueeze(commons.sequence_mask(x_lengths, x.size(2)), 1).to(x.dtype)
     # compute vuv vector
     if self.emb_uv:
@@ -394,9 +402,12 @@ class TextEncoder(nn.Module):
       x = self.pre(x) * x_mask + uv_emb * x_mask
     else:
       x = self.pre(x) * x_mask
-  
+
     if self.f0_emb:
       x = x + self.f0_emb(f0).squeeze(1).transpose(1, 2)
+
+    if self.lang_emb:
+      x = x + self.lang_emb(lang_id).squeeze(1).transpose(1, 2)
 
     x = self.enc_(x * x_mask, x_mask)
     stats = self.proj(x) * x_mask

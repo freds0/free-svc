@@ -5,9 +5,19 @@ spk_encoder_ckpt: models/speaker_encoder/ckpt/pretrained_bak_5805000.pt
 ssl_encoder_type: wavlm
 ssl_encoder_ckpt: models/wavlm/WavLM-Large.pt
 post_ssl_encoder_type: freevc-bottleneck
+cond_lang: true
+coarse_f0: true
+# lang_dim: 4
+lang_dim: 192
+num_langs: 3
+lang_dict:
+  en: 0
+  jp: 1
+  zh: 2
 
-data: 
-  dataset_dir: dataset_nus
+
+data:
+  dataset_dir: metadata
   filter_length: 1280
   hop_length: 320
   max_wav_value: 32768.0
@@ -15,10 +25,10 @@ data:
   mel_fmin: 0.0
   n_mel_channels: 80
   num_workers: 16
-  pitch_features_dir: ${data.dataset_dir}/pitch_features
+  pitch_features_dir: null
   sampling_rate: 16000
-  spectrogram_dir: ${data.dataset_dir}/spectrograms
-  spk_embeddings_dir: ${data.dataset_dir}/spk_embeddings
+  spectrogram_dir: null
+  spk_embeddings_dir: null
   sr_min_max: [68, 92]
   ssl_feature_dir: null
   training_files: ${data.dataset_dir}/train.csv
@@ -26,7 +36,7 @@ data:
   win_length: 1280
 
 train:
-  batch_size: 64
+  batch_size: 32
   betas: [0.8, 0.99]
   c_kl: 1.0
   c_mel: 45
@@ -54,10 +64,10 @@ train:
   warmup_epochs: 0
   weighted_batch_speaker_sampling : true
 
-model: 
+model:
   save_dir: null
   filter_channels: 768
-  finetune_from_model: 
+  finetune_from_model:
     discriminator: null
     generator: null
   gin_channels: 256

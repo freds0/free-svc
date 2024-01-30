@@ -7,6 +7,7 @@ from random import shuffle
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--speaker-name-prefix", type=str, default=None, help="path to output dir")
     parser.add_argument("--source-dir", type=str, default="./dataset/", help="path to source dir")
     parser.add_argument("--seed", type=int, default=None, help="random seed")
     parser.add_argument("--train-list", type=str, default="./dataset/train.csv", help="path to train list")
@@ -16,7 +17,11 @@ if __name__ == "__main__":
 
     if args.seed is not None:
         random.seed(args.seed)
-    
+
+    speaker_name_prefix = ""
+    if args.speaker_name_prefix is not None:
+        speaker_name_prefix = args.speaker_name_prefix
+
     train = []
     val = []
     test = []
@@ -28,7 +33,7 @@ if __name__ == "__main__":
         for root, dirs, files in os.walk(os.path.join(args.source_dir, speaker)):
             for file in files:
                 if file.endswith(".wav"):
-                    spk_wavs.append((os.path.join(root, file), speaker))
+                    spk_wavs.append((os.path.join(root, file), speaker_name_prefix+speaker))
         wavs += spk_wavs
 
     shuffle(wavs)
@@ -44,14 +49,13 @@ if __name__ == "__main__":
     with open(args.train_list, "w") as f:
         for wavpath, speaker in tqdm(train):
             print(wavpath, speaker, sep="|", file=f)
-        
+
     print("Writing", args.val_list)
     with open(args.val_list, "w") as f:
         for wavpath, speaker in tqdm(val):
             print(wavpath, speaker, sep="|", file=f)
-            
+
     print("Writing", args.test_list)
     with open(args.test_list, "w") as f:
         for wavpath, speaker in tqdm(test):
             print(wavpath, speaker, sep="|", file=f)
-            

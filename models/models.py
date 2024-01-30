@@ -64,7 +64,11 @@ class Encoder(nn.Module):
                  dilation_rate,
                  n_layers,
                  gin_channels=0,
-                 cond_f0=False):
+                 cond_f0=False,
+                 cond_lang=False,
+                 lang_dim=0,
+                 num_langs=1,
+                 ):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -79,17 +83,25 @@ class Encoder(nn.Module):
         else:
             self.f0_emb = None
 
+        if cond_lang:
+            self.lang_emb = nn.Embedding(num_langs, lang_dim)
+        else:
+            self.lang_emb = None
+
         self.pre = nn.Conv1d(in_channels, hidden_channels, 1)
         self.enc = modules.WN(hidden_channels, kernel_size,
                               dilation_rate, n_layers, gin_channels=gin_channels)
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
-    def forward(self, x, x_lengths, g=None, f0=None):
+    def forward(self, x, x_lengths, g=None, f0=None, lang_id=None):
         x_mask = torch.unsqueeze(commons.sequence_mask(
             x_lengths, x.size(2)), 1).to(x.dtype)
         x = self.pre(x) * x_mask
         if self.f0_emb:
             x = x + self.f0_emb(f0).squeeze(1).transpose(1, 2)
+        if self.lang_emb:
+            x = x + self.lang_emb(lang_id).unsqueeze(-1)
+
         x = self.enc(x, x_mask, g=g)
         stats = self.proj(x) * x_mask
         m, logs = torch.split(stats, self.out_channels, dim=1)
@@ -355,7 +367,18 @@ class SynthesizerTrn(nn.Module):
             raise ValueError(f"Unknown ssl_encoder_type: {self.config.ssl_encoder_type}")
 
         if self.config.post_ssl_encoder_type == "freevc-bottleneck":
-            self.enc_p = Encoder(ssl_dim, inter_channels, hidden_channels, 5, 1, 16, cond_f0=not self.cond_f0_on_flow)
+            self.enc_p = Encoder(
+                ssl_dim,
+                inter_channels,
+                hidden_channels,
+                5,
+                1,
+                16,
+                cond_f0=not self.cond_f0_on_flow,
+                cond_lang=False if "cond_lang" not in self.config else self.config.cond_lang,
+                num_langs=1 if "num_langs" not in self.config else self.config.num_langs,
+                lang_dim=4 if "lang_dim" not in self.config else self.config.lang_dim,
+            )
         elif self.config.post_ssl_encoder_type == "vits-encoder-with-uv-emb":
             # transformer encoder with voice/unvoice embedding and pitch embedding
             self.enc_p = TextEncoder(
@@ -368,6 +391,9 @@ class SynthesizerTrn(nn.Module):
                 kernel_size=kernel_size,
                 p_dropout=p_dropout,
                 cond_f0=not self.cond_f0_on_flow,
+                cond_lang=False if "cond_lang" not in self.config else self.config.cond_lang,
+                num_langs=1 if "num_langs" not in self.config else self.config.num_langs,
+                lang_dim=4 if "lang_dim" not in self.config else self.config.lang_dim,
             )
         else:
             raise ValueError(f"Unknown post_ssl_encoder_type: {self.config.post_ssl_encoder_type}")
@@ -383,7 +409,7 @@ class SynthesizerTrn(nn.Module):
             self.enc_spk = SpeakerEncoder(
                 model_hidden_size=gin_channels, model_embedding_size=gin_channels)
 
-    def forward(self, spec, y=None, c=None, g=None, mel=None, c_lengths=None, spec_lengths=None, pitch=None):
+    def forward(self, spec, y=None, c=None, g=None, mel=None, c_lengths=None, spec_lengths=None, pitch=None, lang_id=None):
 
         if c is None:
             if self.ssl_model is None:
@@ -413,7 +439,7 @@ class SynthesizerTrn(nn.Module):
         if self.coarse_f0:
             pitch = f0_to_coarse(pitch).detach()
 
-        _, m_p, logs_p, _ = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None)
+        _, m_p, logs_p, _ = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None, lang_id=lang_id)
 
         z, m_q, logs_q, spec_mask = self.enc_q(spec, spec_lengths, g=g)
         z_p = self.flow(z, spec_mask, g=g, pitch=pitch.float() if self.cond_f0_on_flow else None)
@@ -424,7 +450,7 @@ class SynthesizerTrn(nn.Module):
 
         return o, ids_slice, spec_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
 
-    def infer(self, c=None, y=None, g=None, mel=None, c_lengths=None, pitch=None):
+    def infer(self, c=None, y=None, g=None, mel=None, c_lengths=None, pitch=None, lang_id=None):
 
         if c is None:
             if self.ssl_model is None:
@@ -449,7 +475,7 @@ class SynthesizerTrn(nn.Module):
         if self.coarse_f0:
             pitch = f0_to_coarse(pitch).detach()
 
-        z_p, _, _, c_mask = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None)
+        z_p, _, _, c_mask = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None, lang_id=lang_id)
         z = self.flow(z_p, c_mask, g=g, pitch=pitch.float() if self.cond_f0_on_flow else None, reverse=True)
         o = self.dec(z * c_mask, g=g)
 
