@@ -1,0 +1,145 @@
+seed_everything: 123
+
+# ------------------ Datasets ------------------       
+data:
+  class_path: singer_identity.data.siamese_encoders.SiameseEncodersDataModule
+  init_args:
+    dataset_dirs: 
+      # - 'PLACE PATH TO DATASET HERE'
+      # - 'PLACE PATH TO OTHER DATASET HERE IF NEEDED'
+
+# ------------------ Data loading hyperparameters ------------------       
+    batch_size: 140
+    batch_size_val:  140
+    nr_samples: 176000  # 4s in 44.1kHz
+    normalize: true
+    num_workers: 4
+    batch_sampling_mode: "sample_clips"
+    eval_frac: 0.2   # Fraction of the dataset to use for validation
+    verbose: true
+    group_name_is_folder: true
+    group_by_artist: true
+    multi_epoch: 1
+# ------------------ Augmentations ------------------       
+    augmentations: 
+      "enable": true
+      "gaussian_noise": 0.5
+      "pitch_shift_naive": 0
+      "time_stretch": 0
+      "gain": 0.5
+      "shift": 0
+      "parametric_eq": 0
+      "tanh_distortion": 0
+      "time_mask": 0.5
+      "formant_shift_parselmouth": 0
+      "pitch_shift_parselmouth": [1, 1.3]
+      "pitch_range_parselmouth": 1.5
+      "pitch_shift_parselmouth_prob": 0.5
+
+# ------------------ Model ------------------
+model:
+  class_path: singer_identity.trainer.SSLTrainer  # Default trainer class, does not need to change
+  init_args:
+# ------------------ Optimizer ------------------
+    optimizer1_init:
+      class_path: torch.optim.Adam
+      init_args:
+        lr: 0.0001
+        weight_decay: 1e-5
+
+# ------------------ Feature extractor ------------------
+    feature_extractor:
+      spec_layer: 'melspectogram'
+      n_fft: 2048
+      hop_length: 512
+
+# ------------------ Encoder ------------------
+    backbone:
+      backbone: "efficientnet_b0"
+      pretrained: true
+      embedding_dim: 1000  # This is the embedding dimension of the backbone
+
+# ------------------ Projection ------------------       
+    projection:
+      input_dim: 1000
+      output_dim: 128  # Projection dimension
+      l2_normalize: true  # Whether to normalize the projection vectors
+
+
+
+
+# ------------------ Training ------------------
+trainer:
+  max_epochs: 100000  # Maximum number of epochs to train for
+  max_steps: 1000000000   # Maximum number of steps to train for
+  accelerator: "gpu"
+  num_nodes: 1
+# ------------------ Logger ------------------
+  logger:
+    class_path: pytorch_lightning.loggers.TensorBoardLogger  # Replace with logger of choice
+    init_args:
+      save_dir: "logs"
+      name: "log_name_here"  
+
+# ------------------ Vizualization callbacks ------------------
+  callbacks:
+
+# ------------------ Evaluation callbacks ------------------
+#  Evaluation callbacks are used to evaluate the model on the validation set
+#  and are logged during training.
+    - class_path: singer_identity.callbacks.evaluation.OrderEvaluation  # Rank evaluation
+      init_args:
+        log_n_epochs: 5
+        on_train: true
+    - class_path: singer_identity.callbacks.evaluation.EEREvaluation  # EER
+      init_args:
+        log_n_epochs: 5
+        on_train: false
+    - class_path: singer_identity.callbacks.evaluation.HypersphereEvaluation  # Alignment/uniformity
+      init_args:
+        log_n_epochs: 5
+        on_train: true
+
+# ------------------ Checkpoint callbacks ------------------
+# Checkpoint callbacks are used to save the model during training.
+# Uncomment the ones you want to use.
+    - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+      init_args:
+        monitor: "loss/val"
+        mode: "min"
+        filename: "best-val-loss-{epoch}-{step}"
+        save_top_k: 1
+
+    - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+      init_args:
+        every_n_epochs: 50
+        save_top_k: -1
+        filename: "ckpt-{epoch}-{step}"
+
+    # - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+    #   init_args:
+    #     monitor: "EER evaluation proj/val"
+    #     mode: "min"
+    #     filename: "best-eer-val-{epoch}-{step}"
+    #     save_top_k: 1
+    # - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+    #   init_args:
+    #     monitor: "Order evaluation mean proj/val"
+    #     mode: "min"
+    #     filename: "best-rank-val-{epoch}-{step}"
+    #     save_top_k: 1
+    # - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+    #   init_args:
+    #     monitor: "Alignment evaluation proj/val"
+    #     mode: "min"
+    #     filename: "best-alignment-val-{epoch}-{step}"
+    #     save_top_k: 1
+    # - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+    #   init_args:
+    #     monitor: "Uniformity evaluation proj/val"
+    #     mode: "min"
+    #     filename: "best-uniformity-val-{epoch}-{step}"
+    #     save_top_k: 1
+
+    
+

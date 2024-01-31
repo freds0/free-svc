@@ -60,11 +60,11 @@ function extract_features() {
     #    --in-dir $DATASET_DIR_NAME/16k \
     #    --out-dir $DATASET_DIR_NAME/ssl_features 
 
-    python3 scripts/preprocess_sr.py \
-        --in-dir $DATASET_DIR_NAME/16k \
-        --wav-dir $DATASET_DIR_NAME/sr \
-        --ssl-dir $DATASET_DIR_NAME/ssl_features \
-        --num-workers 1
+    # python3 scripts/preprocess_sr.py \
+    #     --in-dir $DATASET_DIR_NAME/16k \
+    #     --wav-dir $DATASET_DIR_NAME/sr \
+    #     --ssl-dir $DATASET_DIR_NAME/ssl_features \
+    #     --num-workers 1
 
     python3 scripts/preprocess_pitch.py \
         --in-dir $DATASET_DIR_NAME/16k \

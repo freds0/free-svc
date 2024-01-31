@@ -1,10 +1,19 @@
 import copy
 import math
+import logging
 import torch
+import torchaudio
 from torch import nn
 from torch.nn import functional as F
 
 from models.ssl_extractors import WavLMFeatureExtractor, HubertFeatureExtractor
+from models.speaker_encoders import (
+    ByolSpeakerEncoder, 
+    CoquiSpeakerEncoder, 
+    DefaultSpeakerEncoder,
+    ECAPA2SpeakerEncoder16k, 
+    RawNet3SpeakerEncoder44k, 
+)
 
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
@@ -42,7 +51,7 @@ class ResidualCouplingBlock(nn.Module):
         self.flows = nn.ModuleList()
         for i in range(n_flows):
             self.flows.append(modules.ResidualCouplingLayer(channels, hidden_channels, kernel_size, dilation_rate,
-                              n_layers, gin_channels=gin_channels, pitch_channels=pitch_channels, mean_only=True))
+                              n_layers, gin_channels=self.gin_channels, pitch_channels=pitch_channels, mean_only=True))
             self.flows.append(modules.Flip())
 
     def forward(self, x, x_mask, g=None, pitch=None, reverse=False):
@@ -81,7 +90,7 @@ class Encoder(nn.Module):
 
         self.pre = nn.Conv1d(in_channels, hidden_channels, 1)
         self.enc = modules.WN(hidden_channels, kernel_size,
-                              dilation_rate, n_layers, gin_channels=gin_channels)
+                              dilation_rate, n_layers, gin_channels=self.gin_channels)
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
     def forward(self, x, x_lengths, g=None, f0=None):
@@ -317,7 +326,9 @@ class SynthesizerTrn(nn.Module):
                  upsample_kernel_sizes,
                  gin_channels,
                  ssl_dim,
-                 use_spk,
+                 use_spk_emb,
+                 freeze_external_spk,
+                 spk_encoder_type,
                  config=None,
                  **kwargs):
 
@@ -337,26 +348,54 @@ class SynthesizerTrn(nn.Module):
         self.upsample_initial_channel = upsample_initial_channel
         self.upsample_kernel_sizes = upsample_kernel_sizes
         self.segment_size = segment_size
-        self.gin_channels = gin_channels
         self.ssl_dim = ssl_dim
-        self.use_spk = use_spk
+        self.gin_channels = gin_channels
         self.config = config
 
-        self.coarse_f0 = True if "coarse_f0" in self.config and self.config.coarse_f0 else False
-        self.cond_f0_on_flow = True if "cond_f0_on_flow" in self.config and self.config.cond_f0_on_flow else False
+        if spk_encoder_type is None and use_spk_emb:
+            logging.warning("Speaker encoder model is None and use_spk_emb is True. Speaker embedding will not be used.")
+        self.spk_encoder_type = spk_encoder_type
+        if self.gin_channels is None and self.spk_encoder_type is None:
+            raise ValueError("gin_channels and spk_encoder_model cannot be None at the same time.")
+        self.use_spk_emb = use_spk_emb
+        self.freeze_external_spk = freeze_external_spk
+        if self.use_spk_emb:
+            if self.spk_encoder_type == "ByolSpeakerEncoder":
+                self.speaker_encoder = ByolSpeakerEncoder(self.config.model.device)
+            elif self.spk_encoder_type == "CoquiSpeakerEncoder":
+                self.speaker_encoder = CoquiSpeakerEncoder(self.config.model.device)
+            elif self.spk_encoder_type == "DefaultSpeakerEncoder":
+                self.speaker_encoder = DefaultSpeakerEncoder(self.config.model.device)
+            elif self.spk_encoder_type == "ECAPA2SpeakerEncoder16k":
+                self.speaker_encoder = ECAPA2SpeakerEncoder16k(self.config.model.device)
+            elif self.spk_encoder_type == "RawNet3SpeakerEncoder44k":
+                self.speaker_encoder = RawNet3SpeakerEncoder44k(self.config.model.device, self.config.spk_encoder_ckpt)
+            else:
+                raise ValueError(f"Unknown spk_encoder_model: {self.spk_encoder_type}")
+            print(f"Speaker encoder model: {self.spk_encoder_type}")
+            
+            if self.gin_channels is None:
+                self.gin_channels = self.speaker_encoder.embedding_dim
+                
+            if self.freeze_external_spk:
+                for param in self.speaker_encoder.parameters():
+                    param.requires_grad = False
+
+        self.coarse_f0 = True if "coarse_f0" in self.config.model and self.config.model.coarse_f0 else False
+        self.cond_f0_on_flow = True if "cond_f0_on_flow" in self.config.model and self.config.model.cond_f0_on_flow else False
         if not self.cond_f0_on_flow and not self.coarse_f0:
             raise ValueError('You can only uses the f0 conditioning on encoder if it is coarse. Please enable coarse_f0 on config !')
 
-        if self.config.ssl_encoder_type == "wavlm":
-            self.ssl_model = WavLMFeatureExtractor(self.config.ssl_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
-        elif self.config.ssl_encoder_type == "hubert":
-            self.ssl_model = HubertFeatureExtractor(self.config.ssl_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
+        if self.config.model.ssl_encoder_type == "wavlm":
+            self.ssl_model = WavLMFeatureExtractor(self.config.model.ssl_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
+        elif self.config.model.ssl_encoder_type == "hubert":
+            self.ssl_model = HubertFeatureExtractor(self.config.model.ssl_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
         else:
-            raise ValueError(f"Unknown ssl_encoder_type: {self.config.ssl_encoder_type}")
+            raise ValueError(f"Unknown ssl_encoder_type: {self.config.model.ssl_encoder_type}")
 
-        if self.config.post_ssl_encoder_type == "freevc-bottleneck":
+        if self.config.model.post_ssl_encoder_type == "freevc-bottleneck":
             self.enc_p = Encoder(ssl_dim, inter_channels, hidden_channels, 5, 1, 16, cond_f0=not self.cond_f0_on_flow)
-        elif self.config.post_ssl_encoder_type == "vits-encoder-with-uv-emb":
+        elif self.config.model.post_ssl_encoder_type == "vits-encoder-with-uv-emb":
             # transformer encoder with voice/unvoice embedding and pitch embedding
             self.enc_p = TextEncoder(
                 ssl_dim,
@@ -373,15 +412,45 @@ class SynthesizerTrn(nn.Module):
             raise ValueError(f"Unknown post_ssl_encoder_type: {self.config.post_ssl_encoder_type}")
 
         self.dec = Generator(inter_channels, resblock, resblock_kernel_sizes, resblock_dilation_sizes,
-                             upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels)
+                             upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=self.gin_channels)
         self.enc_q = Encoder(spec_channels, inter_channels,
-                             hidden_channels, 5, 1, 16, gin_channels=gin_channels)
+                             hidden_channels, 5, 1, 16, gin_channels=self.gin_channels)
         self.flow = ResidualCouplingBlock(
-            inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels, cond_pitch=self.cond_f0_on_flow, pitch_channels=1)
+            inter_channels, hidden_channels, 5, 1, 4, gin_channels=self.gin_channels, cond_pitch=self.cond_f0_on_flow, pitch_channels=1)
 
-        if not self.use_spk:
-            self.enc_spk = SpeakerEncoder(
-                model_hidden_size=gin_channels, model_embedding_size=gin_channels)
+    def get_spk_emb(self, y=None, mel=None):
+        if self.spk_encoder_type == "DefaultSpeakerEncoder":
+            assert mel is not None, "mel is None"
+            g = self.speaker_encoder(mel.transpose(1, 2))
+            g = g.unsqueeze(-1)
+        elif self.spk_encoder_type == "ByolSpeakerEncoder":
+            assert y is not None, "y is None"
+            g = self.speaker_encoder(y)
+            g = g.unsqueeze(-1)
+        elif self.spk_encoder_type == "CoquiSpeakerEncoder":
+            if self.sampling_rate != self.speaker_encoder.audio_config["sample_rate"]:
+                y_spk = torchaudio.functional.resample(
+                        y,
+                        orig_freq=self.hps.data.sampling_rate,
+                        new_freq=self.speaker_encoder.audio_config["sample_rate"],
+                        lowpass_filter_width=64,
+                        rolloff=0.9475937167399596,
+                        resampling_method="kaiser_window",
+                        beta=14.769656459379492,
+                )
+            else:
+                y_spk = y
+            g = self.speaker_encoder.forward(y_spk.contiguous(), l2_norm=True).unsqueeze(-1)
+        elif self.spk_encoder_type == "RawNet3":
+            g = self.speaker_encoder(y)
+            g = g.unsqueeze(-1)
+        elif self.spk_encoder_type == "ECAPA2SpeakerEncoder16k":
+            g = self.speaker_encoder(y)
+            g = g.unsqueeze(-1)
+        else:
+            raise ValueError(f"Unknown spk_encoder_model: {self.spk_encoder_type}")
+
+        return g
 
     def forward(self, spec, y=None, c=None, g=None, mel=None, c_lengths=None, spec_lengths=None, pitch=None):
 
@@ -405,9 +474,9 @@ class SynthesizerTrn(nn.Module):
             spec_lengths = (torch.ones(spec.size(0)) *
                             spec.size(-1)).to(spec.device)
 
-        if not self.use_spk:
-            g = self.enc_spk(mel.transpose(1, 2))
-        g = g.unsqueeze(-1)
+        if g is None:
+            g = self.get_spk_emb(y, mel)
+        assert g is not None, "g is None. Check configuration of speaker encoder model or g input on forward method"
 
         # ToDo: Implement denormalizator of pitch (F0Decoder) on https://github.com/svc-develop-team/so-vits-svc/blob/58865936d6b3e6dbca55ef2c7013bea62253431a/models.py#L369
         if self.coarse_f0:
@@ -442,9 +511,10 @@ class SynthesizerTrn(nn.Module):
 
         if c_lengths == None:
             c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
-        if not self.use_spk:
-            g = self.enc_spk.embed_utterance(mel.transpose(1, 2))
-        g = g.unsqueeze(-1)
+        
+        if g is None:
+            g = self.get_spk_emb(y, mel)
+        assert g is not None, "g is None. Check configuration of speaker encoder model or g input on forward method"
 
         if self.coarse_f0:
             pitch = f0_to_coarse(pitch).detach()
