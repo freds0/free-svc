@@ -1,0 +1,50 @@
+model:
+  class_path: singer_identity.trainer_byol.BYOL
+  init_args:
+# ------------------ Feature extractor ------------------
+    feature_extractor:
+      spec_layer: 'melspectogram'
+      n_fft: 2048
+      hop_length: 512
+# ------------------ Encoder ------------------
+    backbone:
+      backbone: "efficientnet_b0"
+      pretrained: true
+      embedding_dim: 1000
+# ------------------ Projection ------------------       
+    projection:
+      input_dim: 1000
+      output_dim: 128
+      l2_normalize: true
+# ------------------ Predictor ------------------       
+    predictor:
+      dims:
+        - 128
+        - 1024
+        - 128
+      use_batchnorm: true
+    normalize_projections: true
+    weight_callback:
+      class_path: singer_identity.callbacks.ma_updates.MAWeightUpdate
+      init_args:
+        initial_tau: 0.99
+        max_epochs: 1000
+# ------------------ Optimizer ------------------
+    optimizer:
+      class_path: singer_identity.models.byol.Adam
+      init_args:
+        lr: 3e-5
+        weight_decay: 1.5e-6
+    scheduler:
+      class_path: singer_identity.models.byol.LinearWarmupCosineAnnealing
+      init_args:
+        warmup_epochs: 10
+        max_epochs: 1000
+        
+trainer:
+# ------------------ Logger ------------------
+  logger:
+    class_path: pytorch_lightning.loggers.TensorBoardLogger
+    init_args:
+      save_dir: "logs"
+      name: "byol"
