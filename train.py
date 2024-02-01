@@ -238,7 +238,7 @@ class Trainer:
                     c, spec, y, pitch = items
                     g = None
                 spec, y, pitch = spec[:1].cuda(0), y[:1].cuda(0), pitch[:1].cuda(0)
-                if c:
+                if c is not None:
                     c = c[:1].cuda(0)
                 
                 mel = mel_processing.spec_to_mel_torch(

@@ -572,22 +572,21 @@ class FeatureAudioSpeakerCollate():
             pitch_lengths[i] = pitch.size(1)
 
             if pitch.size(1) != spec.size(1):
-                self.logger.debug("pitch.size(1) != spec.size(1): " +
-                                  f"pitch.size(1)={pitch.size(1)} specc.size(1)={spec.size(1)}")
-                c = torch.nn.functional.pad(
-                    c,
-                    (
-                        pitch.size(1)-spec.size(1),
-                        0,
-                    ),
-                    mode="reflect",
-                )
-
-            if pitch.size(1) != spec.size(1):
                 self.logger.error(
                     f"Pitch and spec are different for {fp}: pitch.size={pitch.size(1)} spec.size={spec.size(1)}. Check the duration, sample rate and channels of the audios.")
                 
             if c is not None:
+                if pitch.size(1) != c.size(1):
+                    self.logger.debug("pitch.size(1) != c.size(1): " +
+                                     f"pitch.size(1)={pitch.size(1)} c.size(1)={c.size(1)}")
+                    c = torch.nn.functional.pad(
+                        c,
+                        (
+                            pitch.size(1)-c.size(1),
+                            0,
+                        ),
+                        mode="reflect",
+                    )
                 c_padded[i, :, :c.size(1)] = c
 
             if self.use_spk_emb:
