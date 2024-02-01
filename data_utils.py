@@ -469,6 +469,9 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         elif self.pitch_predictor is not None:
             #_, _, _, pitch, _ = self.pitch_predictor(wavfile.read(audio_path)[1], self.sampling_rate)
             pitch = self.pitch_predictor.compute_f0(wavfile.read(audio_path)[1])
+            if type(pitch) is tuple:
+                self.logger.warning(f"Pitch feature computation might have failed for {audio_path}")
+                pitch = pitch[0]
 
         # Interpolates to ensures that pitch and z have the same length
         z_len = int(audio.shape[-1] / self.hop_length)
@@ -541,12 +544,19 @@ class FeatureAudioSpeakerCollate():
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
         pitch_padded = torch.FloatTensor(
             len(batch), batch[0][3].size(0), max_spec_len)
+        
+        if batch[0][0] is not None:  # If content is not None
+            c_padded = torch.FloatTensor(
+                len(batch), batch[0][0].size(0), max_spec_len)
+            c_padded.zero_()
         spec_padded.zero_()
         wav_padded.zero_()
         pitch_padded.zero_()
 
         for i in range(len(ids_sorted_decreasing)):
             row = batch[ids_sorted_decreasing[i]]
+
+            c = row[0]
 
             spec = row[1]
             spec_padded[i, :, :spec.size(1)] = spec
@@ -560,6 +570,25 @@ class FeatureAudioSpeakerCollate():
 
             pitch_padded[i, :, :pitch.size(1)] = pitch
             pitch_lengths[i] = pitch.size(1)
+
+            if pitch.size(1) != spec.size(1):
+                self.logger.debug("pitch.size(1) != spec.size(1): " +
+                                  f"pitch.size(1)={pitch.size(1)} specc.size(1)={spec.size(1)}")
+                c = torch.nn.functional.pad(
+                    c,
+                    (
+                        pitch.size(1)-spec.size(1),
+                        0,
+                    ),
+                    mode="reflect",
+                )
+
+            if pitch.size(1) != spec.size(1):
+                self.logger.error(
+                    f"Pitch and spec are different for {fp}: pitch.size={pitch.size(1)} spec.size={spec.size(1)}. Check the duration, sample rate and channels of the audios.")
+                
+            if c is not None:
+                c_padded[i, :, :c.size(1)] = c
 
             if self.use_spk_emb:
                 try:
@@ -581,7 +610,12 @@ class FeatureAudioSpeakerCollate():
         spec_padded = spec_padded[:, :, :-1]
         wav_padded = wav_padded[:, :, :-self.hps.data.hop_length]
         
-        c_padded = None
+        if c is not None:
+            c_padded = commons.slice_segments(
+                c_padded, ids_slice, spec_seglen)[:, :, :-1]
+        else:
+            c_padded = None
+
         if self.use_spk_emb:
             return c_padded, spec_padded, wav_padded, pitch_padded, spks
         else:
