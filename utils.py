@@ -95,12 +95,24 @@ def transform(mel, height):
 def stretch(mel, width):  # 0.5-2
     return torchvision.transforms.functional.resize(mel, (mel.size(-2), width))
 
-
+def load_weights(model, checkpoint_path, strict=False):
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    model.load_state_dict(checkpoint['model'], strict=strict)
+    return model
+    
 def load_checkpoint(checkpoint_path, model, optimizer=None, strict=False):
     assert os.path.isfile(checkpoint_path)
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
-    epoch = checkpoint_dict['epoch']
-    learning_rate = checkpoint_dict['learning_rate']
+    if 'epoch' in checkpoint_dict:
+        epoch = checkpoint_dict['epoch']
+    else:
+        epoch = 1
+        logger.info("Epoch information is not found in the checkpoint. Assume it is 1.")
+    if 'learning_rate' in checkpoint_dict:
+        learning_rate = checkpoint_dict['learning_rate']
+    else:
+        learning_rate = None
+        logger.info("Learning rate information is not found in the checkpoint.")
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint_dict['optimizer'])
     saved_state_dict = checkpoint_dict['model']
