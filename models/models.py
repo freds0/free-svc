@@ -3,6 +3,7 @@ import math
 import logging
 import torch
 import torchaudio
+import numpy as np
 from torch import nn
 from torch.nn import functional as F
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
@@ -20,7 +21,26 @@ from models import commons
 from models import modules
 from models.commons import init_weights, get_padding
 from models.so_vits_svc import TextEncoder
-from utils import f0_to_coarse
+
+def f0_to_coarse(f0):
+    f0_bin = 256
+    f0_max = 1100.0
+    f0_min = 50.0
+    f0_mel_min = 1127 * np.log(1 + f0_min / 700)
+    f0_mel_max = 1127 * np.log(1 + f0_max / 700)
+    is_torch = isinstance(f0, torch.Tensor)
+    # guarantee pitch max and min
+    clip_fn = torch.clip if is_torch else np.clip
+    f0 = clip_fn(f0, f0_min, f0_max)
+
+    f0_mel = 1127 * (1 + f0 / 700).log() if is_torch else 1127 * np.log(1 + f0 / 700)
+    f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * (f0_bin - 2) / (f0_mel_max - f0_mel_min) + 1
+
+    f0_mel[f0_mel <= 1] = 1
+    f0_mel[f0_mel > f0_bin - 1] = f0_bin - 1
+    f0_coarse = (f0_mel + 0.5).int() if is_torch else np.rint(f0_mel).astype(np.int)
+    assert f0_coarse.max() <= 255 and f0_coarse.min() >= 1, (f0_coarse.max(), f0_coarse.min())
+    return f0_coarse
 
 
 class ResidualCouplingBlock(nn.Module):
@@ -389,6 +409,8 @@ class SynthesizerTrn(nn.Module):
             self.c_model = WavLMFeatureExtractor(self.config.model.content_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
         elif self.config.model.content_encoder_type == "hubert":
             self.c_model = HubertFeatureExtractor(self.config.model.content_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
+        elif self.config.model.content_encoder_type == None:
+            self.c_model = None
         else:
             raise ValueError(f"Unknown content_encoder_type: {self.config.model.content_encoder_type}")
 

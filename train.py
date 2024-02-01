@@ -60,17 +60,15 @@ class Trainer:
         self.step = 1
         self.epoch = 0
         self.n_data_loader_workers = self.config.data.num_workers
-        if self.n_data_loader_workers > 0:
-            self.logger.warning("Number of workers is greater than 0. Note that online feature extraction is not currently supported.")
         self.scaler = GradScaler(enabled=config.train.fp16_run)
 
     def _train_step(self, net_g, net_d, optim_g, optim_d, c, spec, y, pitch, spk=None, rank=0, writer=None, writer_valid=None):
 
-        self.logger.debug(f"c: {c.shape if c else None}, spec: {spec.shape}, y: {y.shape}, pitch: {pitch.shape}, g: {spk.shape if spk is not None else None}")
+        self.logger.debug(f"c: {c.shape if c is not None else None}, spec: {spec.shape}, y: {y.shape}, pitch: {pitch.shape}, g: {spk.shape if spk is not None else None}")
         spec = spec.cuda(rank, non_blocking=True)
         y = y.cuda(rank, non_blocking=True)
         pitch = pitch.cuda(rank, non_blocking=True)
-        if c:
+        if c is not None:
             c = c.cuda(rank, non_blocking=True)
         mel = mel_processing.spec_to_mel_torch(
             spec,
@@ -421,6 +419,7 @@ class Trainer:
             if self.config.model.finetune_from_model.discriminator:
                 self.logger.info(f"Finetuning from model {self.config.model.finetune_from_model.discriminator}")
                 net_d = utils.load_weights(net_d, self.config.model.finetune_from_model.discriminator).cuda(rank)
+            epoch_str = 1
 
         self.epoch = int(epoch_str)
 

@@ -47,7 +47,7 @@ if __name__ == "__main__":
     sub_folder_list = os.listdir(args.in_dir)
     sub_folder_list.sort()
     for spk in sub_folder_list:
-        print("Preprocessing {} ...".format(spk))
+        print("Preprocessing speaker {} ...".format(spk))
         in_dir = os.path.join(args.in_dir, spk)
         if not os.path.isdir(in_dir):
             continue

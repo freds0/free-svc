@@ -4,6 +4,7 @@ defaults:
 
 data: 
   use_spk_emb: false
+  spk_embeddings_dir: null # compute on forward (model)
   spk_encoder_type: null # compute on forward (model) | ECAPA2SpeakerEncoder16k
   content_encoder_type: null # compute on forward (model) | hubert
   content_encoder_ckpt: null # compute on forward (model) | lengyue233/content-vec-best
