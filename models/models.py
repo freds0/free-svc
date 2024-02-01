@@ -5,8 +5,10 @@ import torch
 import torchaudio
 from torch import nn
 from torch.nn import functional as F
+from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
+from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
-from models.ssl_extractors import WavLMFeatureExtractor, HubertFeatureExtractor
+from models.content_extractors import WavLMFeatureExtractor, HubertFeatureExtractor
 from models.speaker_encoders import (
     ByolSpeakerEncoder, 
     CoquiSpeakerEncoder, 
@@ -14,15 +16,12 @@ from models.speaker_encoders import (
     ECAPA2SpeakerEncoder16k, 
     RawNet3SpeakerEncoder44k, 
 )
-
-from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
-from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
-
 from models import commons
 from models import modules
 from models.commons import init_weights, get_padding
 from models.so_vits_svc import TextEncoder
 from utils import f0_to_coarse
+
 
 class ResidualCouplingBlock(nn.Module):
     def __init__(self,
@@ -325,7 +324,7 @@ class SynthesizerTrn(nn.Module):
                  upsample_initial_channel,
                  upsample_kernel_sizes,
                  gin_channels,
-                 ssl_dim,
+                 c_dim,
                  use_spk_emb,
                  freeze_external_spk,
                  spk_encoder_type,
@@ -348,7 +347,7 @@ class SynthesizerTrn(nn.Module):
         self.upsample_initial_channel = upsample_initial_channel
         self.upsample_kernel_sizes = upsample_kernel_sizes
         self.segment_size = segment_size
-        self.ssl_dim = ssl_dim
+        self.c_dim = c_dim
         self.gin_channels = gin_channels
         self.config = config
 
@@ -386,19 +385,19 @@ class SynthesizerTrn(nn.Module):
         if not self.cond_f0_on_flow and not self.coarse_f0:
             raise ValueError('You can only uses the f0 conditioning on encoder if it is coarse. Please enable coarse_f0 on config !')
 
-        if self.config.model.ssl_encoder_type == "wavlm":
-            self.ssl_model = WavLMFeatureExtractor(self.config.model.ssl_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
-        elif self.config.model.ssl_encoder_type == "hubert":
-            self.ssl_model = HubertFeatureExtractor(self.config.model.ssl_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
+        if self.config.model.content_encoder_type == "wavlm":
+            self.c_model = WavLMFeatureExtractor(self.config.model.content_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
+        elif self.config.model.content_encoder_type == "hubert":
+            self.c_model = HubertFeatureExtractor(self.config.model.content_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
         else:
-            raise ValueError(f"Unknown ssl_encoder_type: {self.config.model.ssl_encoder_type}")
+            raise ValueError(f"Unknown content_encoder_type: {self.config.model.content_encoder_type}")
 
-        if self.config.model.post_ssl_encoder_type == "freevc-bottleneck":
-            self.enc_p = Encoder(ssl_dim, inter_channels, hidden_channels, 5, 1, 16, cond_f0=not self.cond_f0_on_flow)
-        elif self.config.model.post_ssl_encoder_type == "vits-encoder-with-uv-emb":
+        if self.config.model.post_content_encoder_type == "freevc-bottleneck":
+            self.enc_p = Encoder(c_dim, inter_channels, hidden_channels, 5, 1, 16, cond_f0=not self.cond_f0_on_flow)
+        elif self.config.model.post_content_encoder_type == "vits-encoder-with-uv-emb":
             # transformer encoder with voice/unvoice embedding and pitch embedding
             self.enc_p = TextEncoder(
-                ssl_dim,
+                c_dim,
                 inter_channels,
                 hidden_channels,
                 filter_channels=filter_channels,
@@ -409,7 +408,7 @@ class SynthesizerTrn(nn.Module):
                 cond_f0=not self.cond_f0_on_flow,
             )
         else:
-            raise ValueError(f"Unknown post_ssl_encoder_type: {self.config.post_ssl_encoder_type}")
+            raise ValueError(f"Unknown post_content_encoder_type: {self.config.post_content_encoder_type}")
 
         self.dec = Generator(inter_channels, resblock, resblock_kernel_sizes, resblock_dilation_sizes,
                              upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=self.gin_channels)
@@ -455,11 +454,11 @@ class SynthesizerTrn(nn.Module):
     def forward(self, spec, y=None, c=None, g=None, mel=None, c_lengths=None, spec_lengths=None, pitch=None):
 
         if c is None:
-            if self.ssl_model is None:
-                raise ValueError("c is None and ssl_model is also None")
+            if self.c_model is None:
+                raise ValueError("c is None and c_model is also None")
             if y is None:
                 raise ValueError("c is None and y is also None")
-            c = self.ssl_model.extract_features(y)
+            c = self.c_model.extract_features(y)
 
         # c is smaller than spec so interpolate c to the size of spec on dim 1
         if c.size(2) != mel.size(2):
@@ -496,12 +495,12 @@ class SynthesizerTrn(nn.Module):
     def infer(self, c=None, y=None, g=None, mel=None, c_lengths=None, pitch=None):
 
         if c is None:
-            if self.ssl_model is None:
-                raise ValueError("c is None and ssl_model is also None")
+            if self.c_model is None:
+                raise ValueError("c is None and c_model is also None")
             if y is None:
                 raise ValueError("c is None and y is also None")
             with torch.no_grad():
-                c = self.ssl_model.extract_features(y)
+                c = self.c_model.extract_features(y)
         # c is smaller than pitch so pad c to the size of pitch on dim 2 (time dimention). Uses pitch on inference because mel spec is from target speaker not source
         if c.size(2) != pitch.size(2):
             c = torch.nn.functional.interpolate(

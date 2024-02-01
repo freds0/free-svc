@@ -416,11 +416,11 @@ class Trainer:
                 epoch_str = 1
         elif self.config.model.finetune_from_model:
             self.logger.info(
-                f"Finetuning from checkpoint {self.config.train.finetune_from_model}...")
+                f"Finetuning from checkpoint {self.config.model.finetune_from_model}...")
             _, _, _, _ = utils.load_checkpoint(
-                self.config.train.finetune_from_model.generator, net_g, optim_g)
+                self.config.model.finetune_from_model.generator, net_g, optim_g)
             _, _, _, _ = utils.load_checkpoint(
-                self.config.train.finetune_from_model.discriminator, net_d, optim_d)
+                self.config.model.finetune_from_model.discriminator, net_d, optim_d)
             epoch_str = 1
 
         self.epoch = int(epoch_str)

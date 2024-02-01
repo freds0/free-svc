@@ -350,7 +350,7 @@ class FFN(nn.Module):
 
 class TextEncoder(nn.Module):
   def __init__(self,
-      ssl_dim,
+      c_dim,
       out_channels,
       hidden_channels,
       kernel_size,
@@ -366,7 +366,7 @@ class TextEncoder(nn.Module):
     self.kernel_size = kernel_size
     self.n_layers = n_layers
     self.gin_channels = gin_channels
-    self.pre = nn.Conv1d(ssl_dim, hidden_channels, kernel_size=5, padding=2)
+    self.pre = nn.Conv1d(c_dim, hidden_channels, kernel_size=5, padding=2)
     self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
     if cond_f0:
         self.f0_emb = nn.Embedding(256, hidden_channels)

@@ -312,7 +312,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         self.spectrogram_dir = config.data.spectrogram_dir
         self.spk_embeddings_dir = config.data.spk_embeddings_dir
         self.sr_min_max = config.data.sr_min_max
-        self.ssl_feature_dir = config.data.ssl_feature_dir
+        self.content_feature_dir = config.data.content_feature_dir
         self.use_spk_emb = config.data.use_spk_emb
         self.use_sr = config.train.use_sr
         self.win_length = config.data.win_length
@@ -329,7 +329,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
             from models.f0_predictor import get_f0_predictor
 
             self.pitch_predictor = get_f0_predictor(
-                "rmvpe",
+                config.data.pitch_predictor,
                 sampling_rate=self.sampling_rate, 
                 hop_length=self.hop_length,
                 device='cpu',
@@ -407,41 +407,41 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
             return None # Speaker embedding extraction was removed and moved to the forward pass of the model
         return spk
 
-    def _load_ssl_feature(self, audio_path, speaker):
-        if self.ssl_feature_dir is not None:
+    def _load_content_feature(self, audio_path, speaker):
+        if self.content_feature_dir is not None:
             if not self.use_sr:
                 c_path = os.path.join(
-                    self.ssl_feature_dir if self.ssl_feature_dir is not None else "",
+                    self.content_feature_dir if self.content_feature_dir is not None else "",
                     speaker,
                     os.path.basename(audio_path).replace(".wav", ".pt")
                 )
                 self.logger.debug("Loading " + "/".join([
-                    self.ssl_feature_dir if self.ssl_feature_dir is not None else "",
+                    self.content_feature_dir if self.content_feature_dir is not None else "",
                     speaker,
                     os.path.basename(audio_path).replace(".wav", ".pt")
                 ]))
             else:
                 i = random.randint(self.sr_min_max[0], self.sr_min_max[1])
                 c_path = os.path.join(
-                    self.ssl_feature_dir if self.ssl_feature_dir is not None else "",
+                    self.content_feature_dir if self.content_feature_dir is not None else "",
                     speaker,
                     os.path.basename(audio_path).replace(".wav", f"_{i}.pt")
                 )
                 self.logger.debug("Loading " + "/".join([
-                    self.ssl_feature_dir if self.ssl_feature_dir is not None else "",
+                    self.content_feature_dir if self.content_feature_dir is not None else "",
                     speaker,
                     os.path.basename(audio_path).replace(".wav", f"_{i}.pt")
                 ]))
             if not os.path.isfile(c_path):
-                raise Exception(f"SSL feature not found at {c_path}. "
-                                "Please run preprocess_ssl.py to generate SSL features "
-                                "or set ssl_feature_dir to None (will compute during training).")
+                raise Exception(f"Content feature not found at {c_path}. "
+                                "Please run preprocess_content.py to generate content features "
+                                "or set content_feature_dir to None (will compute during training).")
             
             c = torch.load(c_path).squeeze(0)
             self.logger.debug(f"Loaded c.shape: {c.shape}")
 
         else:
-            return None # SSL feature extraction was removed and moved to the forward pass of the model
+            return None # Content feature extraction was removed and moved to the forward pass of the model
         return c
 
     def _load_pitch(self, audio_path, audio, speaker):
@@ -483,7 +483,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         audio_path, speaker = data
         audio_norm = self._load_audio_norm(audio_path)
         spec = self._load_spectrogram(audio_path, audio_norm)
-        c = self._load_ssl_feature(audio_path, speaker)
+        c = self._load_content_feature(audio_path, speaker)
         pitch = self._load_pitch(audio_path, audio_norm, speaker)
         if self.use_spk_emb:
             spk = self._load_spk_embedding(audio_path, speaker)

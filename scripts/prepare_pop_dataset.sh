@@ -78,7 +78,7 @@ function extract_features() {
         --out-dir $DATASET_DIR_NAME/spk_embeddings \
         --num-workers 8
 
-    python3 scripts/preprocess_ssl.py \
+    python3 scripts/preprocess_content.py \
         --in-dir $DATASET_DIR_NAME/16k \
         --out-dir $DATASET_DIR_NAME/ssl_features 
 
