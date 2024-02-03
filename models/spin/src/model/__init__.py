@@ -1,0 +1,1 @@
+from .spin import SpinModel

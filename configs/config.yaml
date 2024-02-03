@@ -2,7 +2,7 @@ defaults:
 - common
 
 train:
-  batch_size: 42
+  batch_size: 64
   betas: [0.8, 0.99]
   c_kl: 1.0
   c_mel: 45
@@ -14,7 +14,7 @@ train:
   raise_error: true
   learning_rate: 2e-4
   log_interval: 10
-  log_level: DEBUG
+  log_level: ${log_level}
   lr_decay: 0.999875
   max_speclen: 128
   port: 8005
@@ -28,7 +28,7 @@ train:
   save_epoch_interval: 10
   save_steps_interval: 1000
   warmup_epochs: 0
-  weighted_batch_speaker_sampling : true
+  weighted_batch_speaker_sampling : false #true
 
 data: 
   dataset_dir: dataset
@@ -43,7 +43,7 @@ data:
   pitch_predictor: rmvpe # pm | crepe | harvest | dio | rmvpe | fcpe
   pitch_features_dir: null 
   sampling_rate: 24000
-  spectrogram_dir: ${data.dataset_dir}/spectrograms
+  spectrogram_dir: null #${data.dataset_dir}/spectrograms # it is recommended NOT to use if you have small disk space
   # For speaker embedding extraction, set the use_spk_emb to True and spk_embeddings_dir (will load from disk) or configure the model to compute it on forward
   use_spk_emb: true
   spk_embeddings_dir: ${data.dataset_dir}/spk_embeddings

@@ -1,0 +1,18 @@
+defaults:
+- common
+- config
+
+data: 
+  use_spk_emb: false
+  spk_embeddings_dir: null # compute on forward (model)
+  spk_encoder_type: null # compute on forward (model) | ECAPA2SpeakerEncoder16k
+  content_encoder_type: null # compute on forward (model) | hubert
+  content_encoder_ckpt: null # compute on forward (model) | lengyue233/content-vec-best
+
+model: 
+  use_spk_emb: true
+  spk_encoder_type: ECAPA2SpeakerEncoder16k
+  spk_encoder_ckpt: null  # Not used for ECAPA2SpeakerEncoder16k
+  content_encoder_type: spin # hubert | wavlm | spin
+  content_encoder_config: models/spin/spin.yaml # path to the config file for the content encoder
+  content_encoder_ckpt: models/spin/spin.ckpt # or models/wavlm/WavLM-Large.pt

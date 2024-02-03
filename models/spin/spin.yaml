@@ -1,0 +1,96 @@
+# Interspeech 2023 version
+
+# Training data
+data:
+  json_dir: /data/sls/r/u/hengjui/home/scratch/spin_test/data
+  splits:
+    - train-clean-100
+  sample_rate: 16000
+  min_audio_len: 40000  # minimum audio samples per utterance
+  random_crop_len: 272000  # maximum audio samples per utterance
+  spk2info: /root/RVC_Spin/spin_train/spk_to_f0.csv
+  out_of_len_audios: /root/RVC_Spin/spin_train/out_of_len_audios.txt
+
+# Validation data (not used for checkpointing, just for monitoring training progress)
+val_data:
+  json_dir: /data/sls/r/u/hengjui/home/scratch/spin_test/data
+  phn_dir: /root/RVC_Spin/spin_train/phone_alignment_info
+  data_dir: /libri_tts/LibriTTS/dev-clean
+  out_of_len_audios: /root/RVC_Spin/spin_train/out_of_len_audios_val.txt
+  splits:
+    - libri-dev-clean
+    - libri-dev-other
+  sample_rate: 16000
+
+# SpinModel config
+model:
+  encoder:
+    type: HuBERT  # `HuBERT` / `WavLM`
+    use_layer: 12  # the layer which its representations are used for clustering
+    normalize: False
+    feat_select: x
+    randomize_all: False
+    randomize_layers: []
+    freeze_all: False
+    freeze_layers: ["pos", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # `pos`: positional encoding, `0`: CNN extractor
+  pred_head:
+    type: DNN
+    hid_dims: [256]
+    dropout: 0
+    activation: ReLU
+  loss:
+    type: SwavVQDisentangle
+    num_vars: 2048  # cluster size
+    epsilon: 0.02
+    sinkhorn_iters: 3
+    temp: 0.1
+    l2_norm: True
+    prob_ratio: 1.0
+
+# Optimization
+optim:
+  optimizer:
+    name: Adam
+    args:
+      lr: 1.e-4
+      weight_decay: 1.e-6
+  scheduler:
+    name: linear_warmup_decay  # `linear_warmup_decay` / `linear_warmup_cosine_scheduler` / `noam_scheduler`
+    args:
+      warmup: 2500
+      max_step: 63052
+      final_lr: 1.e-6
+
+hparam:
+  #batch_len: 4096000  # audio samples per GPU (256 secs ~ batch_size = 12.8k)   4096000
+  batch_size: 32
+  val_batch_size: 8
+
+# pytorch_lightning.Trainer
+# ref: https://lightning.ai/docs/pytorch/latest/common/trainer.html
+trainer:
+  max_steps: 63052
+  gradient_clip_val: 10
+  accumulate_grad_batches: 1
+  precision: 16
+  logger: wandb  # use `False` to disable logging
+  log_every_n_steps: 100
+  default_root_dir: exp/tmp
+  accelerator: gpu
+
+  strategy: ddp_find_unused_parameters_true  # UNCOMMENT this line to enable DDP training
+
+  num_sanity_val_steps: 0
+  val_check_interval: 1000
+
+# pytorch_lightning.callbacks.ModelCheckpoint
+# ref: https://lightning.ai/docs/pytorch/latest/api/lightning.pytorch.callbacks.ModelCheckpoint.html
+checkpoint:
+  filename: "{epoch}-{step}"
+  every_n_train_steps: 2000
+  save_last: true
+
+# pytorch_lightning.loggers.WandbLogger
+# ref: https://lightning.ai/docs/pytorch/latest/extensions/generated/lightning.pytorch.loggers.WandbLogger.html
+logger:
+  project: spin_is2023

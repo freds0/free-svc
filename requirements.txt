@@ -19,4 +19,9 @@ numpy==1.24
 gdown
 torchaudio==2.1.2
 torch==2.1.2
+pytorch_lightning
+s3prl
+stopit
+praat-parselmouth
+webrtcvad
 asteroid_filterbanks
