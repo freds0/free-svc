@@ -2,14 +2,62 @@ import torch
 from torch import nn
 
 import utils
+
+import yaml
 import torchaudio
 from mel_processing import mel_processing
 from models.wavlm import WavLM, WavLMConfig
+from models.spin import SpinModel, spin_collate_fn
 
 import logging
 logging.getLogger('numba').setLevel(logging.WARNING)
 from transformers import HubertModel
 
+
+class SpinModelFeatureExtractor(nn.Module):
+    def __init__(self, config, checkpoint_path, freeze=True, svc_model_sr=16000):
+        super().__init__() 
+        if isinstance(config, str) and config.split(".")[-1] in {"yaml", "yml"}:
+            config = yaml.load(open(config, "r"), Loader=yaml.FullLoader)
+        self.model = SpinModel(config)
+        print(self.model)
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        self.model.load_state_dict(checkpoint['state_dict'])
+        self.model.cuda()
+        self.extractor_sr = 16000
+        self.svc_model_sr = svc_model_sr
+        self.freeze = freeze
+        if self.freeze:
+            for param in self.parameters():
+                param.requires_grad = False
+            self.eval()
+        else:
+            self.train()
+
+    def forward(self, **kwargs):
+        return self.model(**kwargs)
+
+    def extract_features(self, y, layer=-1):
+        if self.svc_model_sr != self.extractor_sr:
+            y = torchaudio.functional.resample(
+                y,
+                orig_freq=self.svc_model_sr,
+                new_freq=self.extractor_sr,
+            )
+
+        wav_list, wav_len, padding_mask = spin_collate_fn(y)
+        wav_list.cuda()
+        padding_mask.cuda()
+        batch = wav_list, wav_len, padding_mask
+
+        if self.freeze:
+            with torch.no_grad():
+                c = self.model.forward_features(wavs=wav_list, padding_mask=padding_mask)[1][layer]
+        else:
+            c = self.model.forward_features(wavs=wav_list, padding_mask=padding_mask)[1][layer]
+
+        c = c.transpose(1, 2)
+        return c
 
 class WavLMFeatureExtractor(WavLM):
     def __init__(self, checkpoint_path, freeze=True, svc_model_sr=16000):

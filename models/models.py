@@ -9,7 +9,11 @@ from torch.nn import functional as F
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
-from models.content_extractors import WavLMFeatureExtractor, HubertFeatureExtractor
+from models.content_extractors import (
+    WavLMFeatureExtractor, 
+    HubertFeatureExtractor, 
+    SpinModelFeatureExtractor
+)
 from models.speaker_encoders import (
     ByolSpeakerEncoder, 
     CoquiSpeakerEncoder, 
@@ -409,6 +413,12 @@ class SynthesizerTrn(nn.Module):
             self.c_model = WavLMFeatureExtractor(self.config.model.content_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
         elif self.config.model.content_encoder_type == "hubert":
             self.c_model = HubertFeatureExtractor(self.config.model.content_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
+        elif self.config.model.content_encoder_type == "spin":
+            self.c_model = SpinModelFeatureExtractor(
+                self.config.model.content_encoder_config, 
+                self.config.model.content_encoder_ckpt, 
+                svc_model_sr=self.config.data.sampling_rate
+            )
         elif self.config.model.content_encoder_type == None:
             self.c_model = None
         else:
