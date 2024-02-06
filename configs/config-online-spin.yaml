@@ -10,6 +10,8 @@ data:
   content_encoder_ckpt: null # compute on forward (model) | lengyue233/content-vec-best
 
 model: 
+  use_transformer_flows: false #true
+  transformer_flow_type: pre_conv # pre_conv | fft | mono_layer
   use_spk_emb: true
   spk_encoder_type: ECAPA2SpeakerEncoder16k
   spk_encoder_ckpt: null  # Not used for ECAPA2SpeakerEncoder16k

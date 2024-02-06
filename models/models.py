@@ -87,6 +87,68 @@ class ResidualCouplingBlock(nn.Module):
         return x
 
 
+class ResidualCouplingTransformersBlock(nn.Module):
+    def __init__(self,
+                 channels,
+                 hidden_channels,
+                 kernel_size,
+                 dilation_rate,
+                 n_layers,
+                 n_flows=4,
+                 gin_channels=0,
+                 pitch_channels=0,
+                 use_transformer_flows=False,
+                 transformer_flow_type="pre_conv",
+                 cond_pitch=True,
+                 ):
+        super().__init__()
+        self.channels = channels
+        self.hidden_channels = hidden_channels
+        self.kernel_size = kernel_size
+        self.dilation_rate = dilation_rate
+        self.n_layers = n_layers
+        self.n_flows = n_flows
+        self.gin_channels = gin_channels
+        self.pitch_channels = pitch_channels
+
+        if not cond_pitch:
+            pitch_channels = 0
+
+        self.flows = nn.ModuleList()
+        if use_transformer_flows:
+            if transformer_flow_type == "pre_conv":
+                for i in range(n_flows):
+                    self.flows.append(modules.ResidualCouplingTransformersLayer(
+                        channels, hidden_channels, kernel_size, dilation_rate, n_layers, gin_channels=gin_channels, pitch_channels=pitch_channels, mean_only=True))
+                    self.flows.append(modules.Flip())
+            elif transformer_flow_type == "fft":
+                for i in range(n_flows):
+                    self.flows.append(modules.FFTransformerCouplingLayer(
+                        channels, hidden_channels, kernel_size, dilation_rate, n_layers, gin_channels=gin_channels, pitch_channels=pitch_channels, mean_only=True))
+                    self.flows.append(modules.Flip())
+            elif transformer_flow_type == "mono_layer":
+                self.flows.append(modules.MonoTransformerFlowLayer(
+                    channels, hidden_channels, mean_only=True))
+                for i in range(n_flows):
+                    self.flows.append(modules.ResidualCouplingLayer(
+                        channels, hidden_channels, kernel_size, dilation_rate, n_layers, gin_channels=gin_channels, pitch_channels=pitch_channels, mean_only=True))
+                    self.flows.append(modules.Flip())
+        else:
+            for i in range(n_flows):
+                self.flows.append(modules.ResidualCouplingLayer(
+                    channels, hidden_channels, kernel_size, dilation_rate, n_layers, gin_channels=gin_channels, pitch_channels=pitch_channels, mean_only=True))
+                self.flows.append(modules.Flip())
+
+    def forward(self, x, x_mask, g=None, pitch=None, reverse=False):
+        if not reverse:
+            for flow in self.flows:
+                x, _ = flow(x, x_mask, g=g, pitch=pitch, reverse=reverse)
+        else:
+            for flow in reversed(self.flows):
+                x = flow(x, x_mask, g=g, pitch=pitch, reverse=reverse)
+        return x
+
+
 class Encoder(nn.Module):
     def __init__(self,
                  in_channels,
@@ -352,6 +414,8 @@ class SynthesizerTrn(nn.Module):
                  use_spk_emb,
                  freeze_external_spk,
                  spk_encoder_type,
+                 use_transformer_flows=True,
+                 transformer_flow_type='mono_layer',
                  config=None,
                  **kwargs):
 
@@ -373,6 +437,13 @@ class SynthesizerTrn(nn.Module):
         self.segment_size = segment_size
         self.c_dim = c_dim
         self.gin_channels = gin_channels
+        self.use_transformer_flows = use_transformer_flows
+        self.transformer_flow_type = transformer_flow_type
+
+        if self.use_transformer_flows:
+            assert self.transformer_flow_type in [
+                "pre_conv", "fft", "mono_layer"], "transformer_flow_type must be one of ['pre_conv', 'fft','mono_layer']"
+            
         self.config = config
 
         if spk_encoder_type is None and use_spk_emb:
@@ -446,8 +517,30 @@ class SynthesizerTrn(nn.Module):
                              upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=self.gin_channels)
         self.enc_q = Encoder(spec_channels, inter_channels,
                              hidden_channels, 5, 1, 16, gin_channels=self.gin_channels)
-        self.flow = ResidualCouplingBlock(
-            inter_channels, hidden_channels, 5, 1, 4, gin_channels=self.gin_channels, cond_pitch=self.cond_f0_on_flow, pitch_channels=1)
+        if self.use_transformer_flows:
+            self.flow = ResidualCouplingTransformersBlock(
+                inter_channels,
+                hidden_channels,
+                5,
+                1,
+                4,
+                use_transformer_flows=self.use_transformer_flows,
+                transformer_flow_type=self.transformer_flow_type,
+                cond_pitch=self.cond_f0_on_flow, 
+                gin_channels=self.gin_channels,
+                pitch_channels=1
+            )
+        else:
+            self.flow = ResidualCouplingBlock(
+                inter_channels, 
+                hidden_channels, 
+                5, 
+                1, 
+                4, 
+                gin_channels=self.gin_channels, 
+                cond_pitch=self.cond_f0_on_flow, 
+                pitch_channels=1
+            )
 
     def get_spk_emb(self, y=None, mel=None):
         if self.spk_encoder_type == "DefaultSpeakerEncoder":
