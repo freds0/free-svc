@@ -6,7 +6,8 @@ train:
   betas: [0.8, 0.99]
   c_kl: 1.0
   c_mel: 45
-  distributed: true
+  distributed: false  # BUG: multi-gpu is not working
+  use_multiprocessing: false # BUG: multi-gpu is not working
   epochs: 10
   eps: 1e-9
   fp16_run: false
@@ -21,7 +22,6 @@ train:
   resume_training: false  # set to false to finetune from a model
   seed: 1234
   segment_size: 8960
-  use_multiprocessing: false
   use_sr: false
   valid_epoch_interval: 1
   valid_steps_interval: 1000
