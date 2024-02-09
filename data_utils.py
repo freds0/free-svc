@@ -17,6 +17,7 @@ import utils
 import models.commons as commons
 from utils import load_wav_to_torch, load_dataset_csv
 from mel_processing import mel_processing
+from models.f0_predictor import get_f0_predictor
 
 
 class DistributedSamplerWrapper(DistributedSampler):
@@ -325,18 +326,17 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
 
         if self.pitch_features_dir is None:
             self.logger.info("pitch_features_dir is None. Will compute pitch features during training.")
-            self.logger.info(
-                "Loading Pitch Predictor for pitch features...")
-            from models.f0_predictor import get_f0_predictor
-
-            self.pitch_predictor = get_f0_predictor(
-                config.data.pitch_predictor,
-                sampling_rate=self.sampling_rate, 
-                hop_length=self.hop_length,
-                device='cpu',
-                threshold=0.05
-            )
-            self.logger.info("Loaded Pitch Predictor.")
+        
+        self.logger.info(
+            "Loading Pitch Predictor for pitch features...")
+        self.pitch_predictor = get_f0_predictor(
+            config.data.pitch_predictor,
+            sampling_rate=self.sampling_rate, 
+            hop_length=self.hop_length,
+            device='cpu',
+            threshold=0.05
+        )
+        self.logger.info("Loaded Pitch Predictor.")
 
         random.seed(config.seed)
         if shuffle:
@@ -470,6 +470,14 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
                 # Clip to avoid negative values
                 pitch = np.clip(pitch, 0, 800)
                 self.logger.debug(f"Loaded pitch.shape: {pitch.shape}")
+            elif self.pitch_predictor is not None:
+                #_, _, _, pitch, _ = self.pitch_predictor(wavfile.read(audio_path)[1], self.sampling_rate)
+                pitch = self.pitch_predictor.compute_f0(wavfile.read(audio_path)[1])
+                if type(pitch) is tuple:
+                    self.logger.warning(f"Pitch feature computation might have failed for {audio_path}")
+                    pitch = pitch[0]
+                os.makedirs(os.path.dirname(pitch_path), exist_ok=True)
+                torch.save(torch.tensor(pitch), pitch_path)
             else:
                 raise Exception(f"Pitch feature not found at {pitch_path}. "
                                 "Please run preprocess_pitch.py to generate pitch features "
