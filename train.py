@@ -41,7 +41,7 @@ from mel_processing import mel_processing
 
 assert torch.cuda.is_available(), "CPU training is not allowed."
 torch.backends.cudnn.benchmark = True
-#os.environ['TORCH_DISTRIBUTED_DEBUG'] = 'INFO'
+os.environ['TORCH_DISTRIBUTED_DEBUG'] = 'INFO'
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,8 @@ class Trainer:
                     scalars=scalar_dict)
         self.step += 1
 
-    def _train_one_epoch(self, nets, optims, train_loader, valid_loader, rank=0, writer=None, writer_valid=None):
+    def _train_one_epoch(self, nets, optims, train_loader, valid_loader=None, rank=0, writer=None, writer_valid=None):
+        assert valid_loader is not None or rank != 0, "Validation loader is required for rank 0"
         self.logger.info("Start training epoch {}...".format(self.epoch))
         net_g, net_d = nets
         optim_g, optim_d = optims
@@ -282,32 +283,53 @@ class Trainer:
                     )
         generator.train()
 
+    def get_dataset_samples_weight(self, dataset_attributes):
+        key_names = np.array(dataset_attributes)
+        attr_names_samples = key_names
+        unique_attr_names = np.unique(attr_names_samples).tolist()
+        attr_idx = [unique_attr_names.index(l) for l in tqdm(attr_names_samples)]
+        attr_count = np.array(
+            [len(np.where(attr_names_samples == l)[0]) for l in tqdm(unique_attr_names)])
+        weight_attr = 1.0 / attr_count
+        self.logger.debug(
+            "Using weighted batch sampling with the following weights:")
+        for k, w in zip(unique_attr_names, weight_attr):
+            self.logger.debug(
+                f"{k.ljust(max([len(s) for s in key_names]))}: {w:.4f}")
+
+        dataset_samples_weight = np.array(
+            [weight_attr[l] for l in attr_idx])
+        dataset_samples_weight = dataset_samples_weight / \
+            np.linalg.norm(dataset_samples_weight)
+        dataset_samples_weight = torch.from_numpy(
+            dataset_samples_weight).float()
+        
+        return dataset_samples_weight
+
     def train(self, rank=0, n_gpus=1):
         self.logger.info("Creating train dataloader")
         train_dataset = FeatureAudioSpeakerLoader(
             self.config.data.training_files, self.config)
-
-        if self.config.train.weighted_batch_speaker_sampling:
-            self.logger.info("Using weighted batch sampling")
-            speaker_names = np.array(train_dataset.speakers)
-            attr_names_samples = speaker_names
-            unique_attr_names = np.unique(attr_names_samples).tolist()
-            attr_idx = [unique_attr_names.index(l) for l in attr_names_samples]
-            attr_count = np.array(
-                [len(np.where(attr_names_samples == l)[0]) for l in unique_attr_names])
-            weight_attr = 1.0 / attr_count
-            self.logger.debug(
-                "Using weighted batch sampling with the following weights:")
-            for spk, w in zip(unique_attr_names, weight_attr):
-                self.logger.debug(
-                    f"{spk.ljust(max([len(s) for s in speaker_names]))}: {w:.4f}")
-
-            dataset_samples_weight = np.array(
-                [weight_attr[l] for l in attr_idx])
-            dataset_samples_weight = dataset_samples_weight / \
-                np.linalg.norm(dataset_samples_weight)
-            dataset_samples_weight = torch.from_numpy(
-                dataset_samples_weight).float()
+        
+        if self.config.train.weighted_batch_speaker_sampling or self.config.train.weighted_batch_lang_sampling:
+            self.logger.info("Configuring weighted batch sampling. This may take a while...")
+            
+            if self.config.train.weighted_batch_speaker_sampling:
+                dataset_samples_weight_spk = self.get_dataset_samples_weight(train_dataset.speakers) 
+                self.logger.debug(dataset_samples_weight_spk)
+            if self.config.train.weighted_batch_lang_sampling:
+                dataset_samples_weight_lang = self.get_dataset_samples_weight(train_dataset.lang)
+                self.logger.debug(dataset_samples_weight_lang)
+            
+            if self.config.train.weighted_batch_speaker_sampling and self.config.train.weighted_batch_lang_sampling:
+                dataset_samples_weight = (
+                    dataset_samples_weight_spk*self.config.train.weighted_batch_speaker_sampling + 
+                    dataset_samples_weight_lang*self.config.train.weighted_batch_lang_sampling
+                )
+            elif self.config.train.weighted_batch_speaker_sampling:
+                dataset_samples_weight = dataset_samples_weight_spk*self.config.train.weighted_batch_speaker_sampling
+            elif self.config.train.weighted_batch_lang_sampling:
+                dataset_samples_weight = dataset_samples_weight_lang*self.config.train.weighted_batch_lang_sampling
             w_sampler = WeightedRandomSampler(
                 dataset_samples_weight, len(dataset_samples_weight))
             batch_sampler = BucketBatchSampler(
@@ -338,7 +360,7 @@ class Trainer:
                 shuffle=True)
             collate_fn = FeatureAudioSpeakerCollate(self.config, train_dataset)
             train_loader = DataLoader(train_dataset,
-                                      num_workers=0,  # TODO make this configurable
+                                      num_workers=self.config.data.num_workers,
                                       shuffle=False,
                                       pin_memory=True,
                                       collate_fn=collate_fn,
@@ -415,10 +437,10 @@ class Trainer:
         else:
             if self.config.model.finetune_from_model.generator:
                 self.logger.info(f"Finetuning from model {self.config.model.finetune_from_model.generator}")
-                net_g = utils.load_weights(net_g, self.config.model.finetune_from_model.generator).cuda(rank)
+                net_g = utils.load_weights(net_g, self.config.model.finetune_from_model.generator, strict=False).cuda(rank)
             if self.config.model.finetune_from_model.discriminator:
                 self.logger.info(f"Finetuning from model {self.config.model.finetune_from_model.discriminator}")
-                net_d = utils.load_weights(net_d, self.config.model.finetune_from_model.discriminator).cuda(rank)
+                net_d = utils.load_weights(net_d, self.config.model.finetune_from_model.discriminator, strict=False).cuda(rank)
             epoch_str = 1
 
         self.epoch = int(epoch_str)
@@ -445,21 +467,22 @@ class Trainer:
                                       valid_loader=valid_loader,
                                       writer=writer_train,
                                       writer_valid=writer_valid)
+                
+                if self.epoch % self.config.train.valid_epoch_interval == 0:
+                    self.evaluate(generator=net_g, valid_loader=valid_loader, writer_valid=writer_valid)
+                if self.epoch % self.config.train.save_epoch_interval == 0:
+                    utils.save_checkpoint(net_g, optim_g, self.config.train.learning_rate, self.epoch, os.path.join(
+                        self.save_dir, f"G_{self.epoch:05d}_{self.step:07d}.pth"))
+                    utils.save_checkpoint(net_d, optim_d, self.config.train.learning_rate, self.epoch, os.path.join(
+                        self.save_dir, f"D_{self.epoch:05d}_{self.step:07d}.pth"))
+                        
             else:
                 self._train_one_epoch(rank=rank,
                                       nets=[net_g, net_d],
                                       optims=[optim_g, optim_d],
-                                      valid_loader=valid_loader)
+                                      train_loader=train_loader)
 
 
-            if self.epoch % self.config.train.valid_epoch_interval == 0:
-                self.evaluate(generator=net_g, valid_loader=valid_loader, writer_valid=writer_valid)
-            if self.epoch % self.config.train.save_epoch_interval == 0:
-                utils.save_checkpoint(net_g, optim_g, self.config.train.learning_rate, self.epoch, os.path.join(
-                    self.save_dir, f"G_{self.epoch:05d}_{self.step:07d}.pth"))
-                utils.save_checkpoint(net_d, optim_d, self.config.train.learning_rate, self.epoch, os.path.join(
-                    self.save_dir, f"D_{self.epoch:05d}_{self.step:07d}.pth"))
-                    
             if rank == 0:
                 self.logger.info("End of epoch {} | Time: {:.3f}s".format(
                     self.epoch, time.time() - start_time))
@@ -485,6 +508,11 @@ def main(cfg: DictConfig):
     n_gpus = torch.cuda.device_count()
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = str(cfg.train.port)
+
+    if cfg.train.distributed and n_gpus > 1:
+        if not cfg.train.use_multiprocessing:
+            raise ValueError(
+                "Distributed training is only supported in multiprocessing mode.")
 
     if cfg.train.use_multiprocessing:
         # TODO: add hydra logging support for mp.spawn

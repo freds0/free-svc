@@ -15,7 +15,7 @@ from scipy.io import wavfile
 
 import utils
 import models.commons as commons
-from utils import load_wav_to_torch, load_filepaths_and_spk
+from utils import load_wav_to_torch, load_dataset_csv
 from mel_processing import mel_processing
 
 
@@ -294,9 +294,10 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         self.logger.setLevel(config.log_level)
         self.logger.info(f"Initializing FeatureAudioSpeakerLoader - file path: {file_path}")
         
-        self.audio_paths_and_speakers = load_filepaths_and_spk(file_path)
-        self.audio_paths = [x[0] for x in self.audio_paths_and_speakers]
-        self.speakers = [x[1] for x in self.audio_paths_and_speakers]
+        self.metadata = load_dataset_csv(file_path)
+        self.audio_paths = [x[0] for x in self.metadata]
+        self.lang = [x[1] for x in self.metadata]
+        self.speakers = [x[2] for x in self.metadata]
 
         if len(self.audio_paths) < config.train.batch_size:
             self.logger.warning(
@@ -339,7 +340,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
 
         random.seed(config.seed)
         if shuffle:
-            random.shuffle(self.audio_paths_and_speakers)
+            random.shuffle(self.metadata)
         self._filter()
 
     def _filter(self):
@@ -351,7 +352,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         # spec_length = wav_length // hop_length
 
         lengths = []
-        for audiopath, _ in self.audio_paths_and_speakers:
+        for audiopath, _, _ in self.metadata:
             lengths.append(os.path.getsize(
                 audiopath) // (2 * self.hop_length))
         self.lengths = lengths
@@ -365,9 +366,11 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         audio_norm = audio_norm.unsqueeze(0)
         return audio_norm
 
-    def _load_spectrogram(self, audio_path, audio):
+    def _load_spectrogram(self, audio_path, audio, lang, speaker):
         spec_path = os.path.join(
             self.spectrogram_dir if self.spectrogram_dir is not None else "",
+            lang, 
+            speaker,
             os.path.basename(audio_path).replace(".wav", ".spec.pt")
         )
         if os.path.exists(spec_path):
@@ -407,16 +410,18 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
             return None # Speaker embedding extraction was removed and moved to the forward pass of the model
         return spk
 
-    def _load_content_feature(self, audio_path, speaker):
+    def _load_content_feature(self, audio_path, lang, speaker):
         if self.content_feature_dir is not None:
             if not self.use_sr:
                 c_path = os.path.join(
                     self.content_feature_dir if self.content_feature_dir is not None else "",
+                    lang,
                     speaker,
                     os.path.basename(audio_path).replace(".wav", ".pt")
                 )
                 self.logger.debug("Loading " + "/".join([
                     self.content_feature_dir if self.content_feature_dir is not None else "",
+                    lang,
                     speaker,
                     os.path.basename(audio_path).replace(".wav", ".pt")
                 ]))
@@ -424,11 +429,13 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
                 i = random.randint(self.sr_min_max[0], self.sr_min_max[1])
                 c_path = os.path.join(
                     self.content_feature_dir if self.content_feature_dir is not None else "",
+                    lang,
                     speaker,
                     os.path.basename(audio_path).replace(".wav", f"_{i}.pt")
                 )
                 self.logger.debug("Loading " + "/".join([
                     self.content_feature_dir if self.content_feature_dir is not None else "",
+                    lang,
                     speaker,
                     os.path.basename(audio_path).replace(".wav", f"_{i}.pt")
                 ]))
@@ -444,20 +451,21 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
             return None # Content feature extraction was removed and moved to the forward pass of the model
         return c
 
-    def _load_pitch(self, audio_path, audio, speaker):
+    def _load_pitch(self, audio_path, audio, lang, speaker):
         if self.pitch_features_dir is not None:
             pitch_path = os.path.join(
                 self.pitch_features_dir,
+                lang,
                 speaker,
                 os.path.basename(audio_path).replace(".wav", "_pitch.pt")
             )
             self.logger.debug("Loading " + "/".join([
                 self.pitch_features_dir,
+                lang,
                 speaker,
                 os.path.basename(audio_path).replace(".wav", "_pitch.pt")
             ]))
             if os.path.exists(pitch_path):
-
                 pitch = torch.load(pitch_path).squeeze().numpy()
                 # Clip to avoid negative values
                 pitch = np.clip(pitch, 0, 800)
@@ -483,13 +491,13 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         return pitch
 
     def get_audio_and_features(self, data):
-        audio_path, speaker = data
+        audio_path, lang, speaker = data
         audio_norm = self._load_audio_norm(audio_path)
-        spec = self._load_spectrogram(audio_path, audio_norm)
-        c = self._load_content_feature(audio_path, speaker)
-        pitch = self._load_pitch(audio_path, audio_norm, speaker)
+        spec = self._load_spectrogram(audio_path, audio_norm, lang, speaker)
+        c = self._load_content_feature(audio_path, lang, speaker)
+        pitch = self._load_pitch(audio_path, audio_norm, lang, speaker)
         if self.use_spk_emb:
-            spk = self._load_spk_embedding(audio_path, speaker)
+            spk = self._load_spk_embedding(audio_path, lang, speaker)
 
         if self.use_spk_emb:
             return [c, spec, audio_norm, pitch, spk]
@@ -497,10 +505,10 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
             return [c, spec, audio_norm, pitch]
 
     def __getitem__(self, index):
-        return self.audio_paths_and_speakers[index]
+        return self.metadata[index]
     
     def __len__(self):
-        return len(self.audio_paths_and_speakers)
+        return len(self.metadata)
 
 
 class FeatureAudioSpeakerCollate():
@@ -518,9 +526,9 @@ class FeatureAudioSpeakerCollate():
         self.logger.debug(str(batch_files_and_speakers)[:1000])
 
         batch = []
-        for fp, spk in batch_files_and_speakers:
-            self.logger.debug(f"fp: {fp}, spk: {spk}")
-            b = self.dataset.get_audio_and_features((fp, spk))
+        for fp, lang, spk in batch_files_and_speakers:
+            self.logger.debug(f"fp: {fp}, lang: {lang}, spk: {spk}")
+            b = self.dataset.get_audio_and_features((fp, lang, spk))
             b.append(fp)
             batch.append(b.copy())
 

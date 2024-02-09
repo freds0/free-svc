@@ -97,6 +97,7 @@ def stretch(mel, width):  # 0.5-2
 
 def load_weights(model, checkpoint_path, strict=False):
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    model = torch.nn.DataParallel(model)
     model.load_state_dict(checkpoint['model'], strict=strict)
     return model
     
@@ -232,7 +233,7 @@ def load_wav_to_torch(full_path):
     return torch.FloatTensor(data.astype(np.float32)), sampling_rate
 
 
-def load_filepaths_and_spk(file_path, split="|"):
+def load_dataset_csv(file_path, split="|"):
     with open(file_path, encoding='utf-8') as f:
         data = [line.strip().split(split) for line in f]
     return data
