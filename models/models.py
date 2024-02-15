@@ -10,16 +10,16 @@ from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
 from models.content_extractors import (
-    WavLMFeatureExtractor, 
-    HubertFeatureExtractor, 
+    WavLMFeatureExtractor,
+    HubertFeatureExtractor,
     SpinModelFeatureExtractor
 )
 from models.speaker_encoders import (
-    ByolSpeakerEncoder, 
-    CoquiSpeakerEncoder, 
+    ByolSpeakerEncoder,
+    CoquiSpeakerEncoder,
     DefaultSpeakerEncoder,
-    ECAPA2SpeakerEncoder16k, 
-    RawNet3SpeakerEncoder44k, 
+    ECAPA2SpeakerEncoder16k,
+    RawNet3SpeakerEncoder44k,
 )
 from models import commons
 from models import modules
@@ -96,7 +96,10 @@ class Encoder(nn.Module):
                  dilation_rate,
                  n_layers,
                  gin_channels=0,
-                 cond_f0=False):
+                 cond_f0=False,
+                 cond_lang=False,
+                 lang_dim=0,
+                 num_langs=1):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -111,17 +114,24 @@ class Encoder(nn.Module):
         else:
             self.f0_emb = None
 
+        if cond_lang:
+            self.lang_emb = nn.Embedding(num_langs, lang_dim)
+        else:
+            self.lang_emb = None
+
         self.pre = nn.Conv1d(in_channels, hidden_channels, 1)
         self.enc = modules.WN(hidden_channels, kernel_size,
                               dilation_rate, n_layers, gin_channels=self.gin_channels)
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
-    def forward(self, x, x_lengths, g=None, f0=None):
+    def forward(self, x, x_lengths, g=None, f0=None, lang_id=None):
         x_mask = torch.unsqueeze(commons.sequence_mask(
             x_lengths, x.size(2)), 1).to(x.dtype)
         x = self.pre(x) * x_mask
         if self.f0_emb:
             x = x + self.f0_emb(f0).squeeze(1).transpose(1, 2)
+        if self.lang_emb:
+            x = x + self.lang_emb(lang_id).unsqueeze(-1) # Use of broadcasting
         x = self.enc(x, x_mask, g=g)
         stats = self.proj(x) * x_mask
         m, logs = torch.split(stats, self.out_channels, dim=1)
@@ -396,10 +406,10 @@ class SynthesizerTrn(nn.Module):
             else:
                 raise ValueError(f"Unknown spk_encoder_model: {self.spk_encoder_type}")
             print(f"Speaker encoder model: {self.spk_encoder_type}")
-            
+
             if self.gin_channels is None:
                 self.gin_channels = self.speaker_encoder.embedding_dim
-                
+
             if self.freeze_external_spk:
                 for param in self.speaker_encoder.parameters():
                     param.requires_grad = False
@@ -415,8 +425,8 @@ class SynthesizerTrn(nn.Module):
             self.c_model = HubertFeatureExtractor(self.config.model.content_encoder_ckpt, svc_model_sr=self.config.data.sampling_rate)
         elif self.config.model.content_encoder_type == "spin":
             self.c_model = SpinModelFeatureExtractor(
-                self.config.model.content_encoder_config, 
-                self.config.model.content_encoder_ckpt, 
+                self.config.model.content_encoder_config,
+                self.config.model.content_encoder_ckpt,
                 svc_model_sr=self.config.data.sampling_rate
             )
         elif self.config.model.content_encoder_type == None:
@@ -425,7 +435,18 @@ class SynthesizerTrn(nn.Module):
             raise ValueError(f"Unknown content_encoder_type: {self.config.model.content_encoder_type}")
 
         if self.config.model.post_content_encoder_type == "freevc-bottleneck":
-            self.enc_p = Encoder(c_dim, inter_channels, hidden_channels, 5, 1, 16, cond_f0=not self.cond_f0_on_flow)
+            self.enc_p = Encoder(
+                c_dim,
+                inter_channels,
+                hidden_channels,
+                5,
+                1,
+                16,
+                cond_f0=not self.cond_f0_on_flow,
+                cond_lang=self.config.data.get("use_lang_emb", False),
+                num_langs=self.config.data.get("num_langs", 7),
+                lang_dim=self.config.data.get("lang_dim", 192),
+            )
         elif self.config.model.post_content_encoder_type == "vits-encoder-with-uv-emb":
             # transformer encoder with voice/unvoice embedding and pitch embedding
             self.enc_p = TextEncoder(
@@ -438,6 +459,9 @@ class SynthesizerTrn(nn.Module):
                 kernel_size=kernel_size,
                 p_dropout=p_dropout,
                 cond_f0=not self.cond_f0_on_flow,
+                cond_lang=self.config.data.get("use_lang_emb", False),
+                num_langs=self.config.data.get("num_langs", 7),
+                lang_dim=self.config.data.get("lang_dim", 192),
             )
         else:
             raise ValueError(f"Unknown post_content_encoder_type: {self.config.post_content_encoder_type}")
@@ -483,7 +507,7 @@ class SynthesizerTrn(nn.Module):
 
         return g
 
-    def forward(self, spec, y=None, c=None, g=None, mel=None, c_lengths=None, spec_lengths=None, pitch=None):
+    def forward(self, spec, y=None, c=None, g=None, mel=None, c_lengths=None, spec_lengths=None, pitch=None, lang_id=None):
 
         if c is None:
             if self.c_model is None:
@@ -513,7 +537,7 @@ class SynthesizerTrn(nn.Module):
         if self.coarse_f0:
             pitch = f0_to_coarse(pitch).detach()
 
-        _, m_p, logs_p, _ = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None)
+        _, m_p, logs_p, _ = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None, lang_id=lang_id)
 
         z, m_q, logs_q, spec_mask = self.enc_q(spec, spec_lengths, g=g)
         z_p = self.flow(z, spec_mask, g=g, pitch=pitch.float() if self.cond_f0_on_flow else None)
@@ -524,7 +548,7 @@ class SynthesizerTrn(nn.Module):
 
         return o, ids_slice, spec_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
 
-    def infer(self, c=None, y=None, g=None, mel=None, c_lengths=None, pitch=None):
+    def infer(self, c=None, y=None, g=None, mel=None, c_lengths=None, pitch=None, lang_id=None):
 
         if c is None:
             if self.c_model is None:
@@ -542,7 +566,7 @@ class SynthesizerTrn(nn.Module):
 
         if c_lengths == None:
             c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
-        
+
         if g is None:
             g = self.get_spk_emb(y, mel)
         assert g is not None, "g is None. Check configuration of speaker encoder model or g input on forward method"
@@ -550,7 +574,7 @@ class SynthesizerTrn(nn.Module):
         if self.coarse_f0:
             pitch = f0_to_coarse(pitch).detach()
 
-        z_p, _, _, c_mask = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None)
+        z_p, _, _, c_mask = self.enc_p(c, c_lengths, f0=pitch if not self.cond_f0_on_flow else None, lang_id=lang_id)
         z = self.flow(z_p, c_mask, g=g, pitch=pitch.float() if self.cond_f0_on_flow else None, reverse=True)
         o = self.dec(z * c_mask, g=g)
 

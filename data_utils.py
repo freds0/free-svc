@@ -294,7 +294,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         self.config = config
         self.logger.setLevel(config.log_level)
         self.logger.info(f"Initializing FeatureAudioSpeakerLoader - file path: {file_path}")
-        
+
         self.metadata = load_dataset_csv(file_path)
         self.audio_paths = [x[0] for x in self.metadata]
         self.lang = [x[1] for x in self.metadata]
@@ -319,6 +319,9 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         self.use_sr = config.train.use_sr
         self.win_length = config.data.win_length
 
+        # Retro-compatibility with previous config files
+        self.use_lang_emb = config.data.get("use_lang_emb", False)
+
         if self.spectrogram_dir is not None:
             self.logger.info(
                 f"Creating spectrogram directory {self.spectrogram_dir}")
@@ -326,12 +329,12 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
 
         if self.pitch_features_dir is None:
             self.logger.info("pitch_features_dir is None. Will compute pitch features during training.")
-        
+
         self.logger.info(
             "Loading Pitch Predictor for pitch features...")
         self.pitch_predictor = get_f0_predictor(
             config.data.pitch_predictor,
-            sampling_rate=self.sampling_rate, 
+            sampling_rate=self.sampling_rate,
             hop_length=self.hop_length,
             device='cpu',
             threshold=0.05
@@ -369,7 +372,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
     def _load_spectrogram(self, audio_path, audio, lang, speaker):
         spec_path = os.path.join(
             self.spectrogram_dir if self.spectrogram_dir is not None else "",
-            lang, 
+            lang,
             speaker,
             os.path.basename(audio_path).replace(".wav", ".spec.pt")
         )
@@ -402,7 +405,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
                 raise Exception(f"Speaker embedding not found at {spk_path}. "
                                 "Please run preprocess_spk.py to generate speaker embeddings "
                                 "or set spk_embeddings_dir to None (will compute during training).")
-            
+
             spk = torch.from_numpy(np.load(spk_path))
             self.logger.debug(f"Loaded spk.shape: {spk.shape}")
 
@@ -443,7 +446,7 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
                 raise Exception(f"Content feature not found at {c_path}. "
                                 "Please run preprocess_content.py to generate content features "
                                 "or set content_feature_dir to None (will compute during training).")
-            
+
             c = torch.load(c_path).squeeze(0)
             self.logger.debug(f"Loaded c.shape: {c.shape}")
 
@@ -498,6 +501,10 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
 
         return pitch
 
+    def _load_language_id(self, lang):
+        lang_id = self.config.data.lang2id[lang]
+        return lang_id
+
     def get_audio_and_features(self, data):
         audio_path, lang, speaker = data
         audio_norm = self._load_audio_norm(audio_path)
@@ -506,15 +513,21 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
         pitch = self._load_pitch(audio_path, audio_norm, lang, speaker)
         if self.use_spk_emb:
             spk = self._load_spk_embedding(audio_path, lang, speaker)
+        if self.use_lang_emb:
+            lang_id = self._load_language_id(lang)
 
-        if self.use_spk_emb:
+        if self.use_spk_emb and not self.use_lang_emb:
             return [c, spec, audio_norm, pitch, spk]
+        elif self.use_lang_emb and self.use_spk_emb:
+            return [c, spec, audio_norm, pitch, spk, lang_id]
+        elif self.use_lang_emb and not self.use_spk_emb:
+            return [c, spec, audio_norm, pitch, lang_id]
         else:
             return [c, spec, audio_norm, pitch]
 
     def __getitem__(self, index):
         return self.metadata[index]
-    
+
     def __len__(self):
         return len(self.metadata)
 
@@ -528,6 +541,8 @@ class FeatureAudioSpeakerCollate():
         self.hps = config
         self.use_sr = config.train.use_sr
         self.use_spk_emb = config.data.use_spk_emb
+        # Retro-compatibility with previous config files
+        self.use_lang_emb = config.data.get("use_lang_emb", False)
         self.dataset = dataset
 
     def __call__(self, batch_files_and_speakers):
@@ -550,17 +565,23 @@ class FeatureAudioSpeakerCollate():
         spec_lengths = torch.LongTensor(len(batch))
         wav_lengths = torch.LongTensor(len(batch))
         pitch_lengths = torch.LongTensor(len(batch))
+        lang_lengths = torch.LongTensor(len(batch))
         if self.use_spk_emb:
             spks = torch.FloatTensor(len(batch), batch[0][4].size(0))
         else:
             spks = None
+
+        if self.use_lang_emb:
+            lang_ids = torch.LongTensor(len(batch))
+        else:
+            lang_ids = None
 
         spec_padded = torch.FloatTensor(
             len(batch), batch[0][1].size(0), max_spec_len)
         wav_padded = torch.FloatTensor(len(batch), 1, max_wav_len)
         pitch_padded = torch.FloatTensor(
             len(batch), batch[0][3].size(0), max_spec_len)
-        
+
         if batch[0][0] is not None:  # If content is not None
             c_padded = torch.FloatTensor(
                 len(batch), batch[0][0].size(0), max_spec_len)
@@ -590,7 +611,7 @@ class FeatureAudioSpeakerCollate():
             if pitch.size(1) != spec.size(1):
                 self.logger.error(
                     f"Pitch and spec are different for {fp}: pitch.size={pitch.size(1)} spec.size={spec.size(1)}. Check the duration, sample rate and channels of the audios.")
-                
+
             if c is not None:
                 if pitch.size(1) != c.size(1):
                     self.logger.debug("pitch.size(1) != c.size(1): " +
@@ -610,6 +631,11 @@ class FeatureAudioSpeakerCollate():
                     spks[i] = row[4]
                 except:
                     self.logger.error(str(spks[i]) + " " + str(row[4]))
+                if self.use_lang_emb:
+                    lang_ids[i] = row[5]
+            else:
+                if self.use_lang_emb:
+                    lang_ids[i] = row[4]
         spec_seglen = spec_lengths[-1] if spec_lengths[-1] < self.hps.train.max_speclen + \
             1 else self.hps.train.max_speclen + 1
         wav_seglen = spec_seglen * self.hps.data.hop_length
@@ -624,15 +650,19 @@ class FeatureAudioSpeakerCollate():
 
         spec_padded = spec_padded[:, :, :-1]
         wav_padded = wav_padded[:, :, :-self.hps.data.hop_length]
-        
+
         if c is not None:
             c_padded = commons.slice_segments(
                 c_padded, ids_slice, spec_seglen)[:, :, :-1]
         else:
             c_padded = None
 
-        if self.use_spk_emb:
+        if self.use_spk_emb and not self.use_lang_emb:
             return c_padded, spec_padded, wav_padded, pitch_padded, spks
+        elif self.use_lang_emb and self.use_spk_emb:
+            return c_padded, spec_padded, wav_padded, pitch_padded, spks, lang_ids
+        elif self.use_lang_emb and not self.use_spk_emb:
+            return c_padded, spec_padded, wav_padded, pitch_padded, lang_ids
         else:
             return c_padded, spec_padded, wav_padded, pitch_padded
 
