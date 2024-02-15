@@ -406,12 +406,6 @@ class TextEncoder(nn.Module):
       x = x + self.f0_emb(f0).squeeze(1).transpose(1, 2)
 
     if self.lang_emb:
-      print("-"*100, "1")
-      print(lang_id)
-      print(x.shape)
-      print(self.lang_emb(lang_id).shape)
-      print(self.lang_emb(lang_id).unsqueeze(-1).shape)
-      print("-"*100, "2")
       x = x + self.lang_emb(lang_id).unsqueeze(-1) # Use of broadcasting
 
     x = self.enc_(x * x_mask, x_mask)

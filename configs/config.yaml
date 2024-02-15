@@ -28,10 +28,10 @@ train:
   save_epoch_interval: 10
   save_steps_interval: 1000
   warmup_epochs: 0
-  weighted_batch_speaker_sampling : false
-  weighted_batch_lang_sampling : false
-  # weighted_batch_speaker_sampling : 0.5
-  # weighted_batch_lang_sampling : 0.5
+  # weighted_batch_speaker_sampling : false
+  # weighted_batch_lang_sampling : false
+  weighted_batch_speaker_sampling : 0.5
+  weighted_batch_lang_sampling : 0.5
 
 data:
   dataset_dir: data

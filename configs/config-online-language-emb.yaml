@@ -5,7 +5,7 @@ defaults:
 data:
   use_lang_emb: true
   num_langs: 7
-  lang_dim: 192
+  lang_dim: 192 # same size as hidden_channels to facilitate the addition
   lang2id:
     es: 0 # spanish
     pt: 1 # portuguese
