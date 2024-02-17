@@ -270,7 +270,7 @@ class Trainer:
                     self.config.data.mel_fmin,
                     self.config.data.mel_fmax)
 
-                y_hat = generator.module.infer(c=c, y=y, g=g, mel=mel, pitch=pitch, lang_id=lang_id)
+                y_hat = generator.infer(c=c, y=y, g=g, mel=mel, pitch=pitch, lang_id=lang_id)
 
                 y_hat_mel = mel_processing.mel_spectrogram_torch(
                     y_hat.squeeze(1).float(),
