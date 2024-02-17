@@ -33,7 +33,7 @@ train:
   weighted_batch_speaker_sampling : 0.5
   weighted_batch_lang_sampling : 0.5
 
-data: 
+data:
   dataset_dir: data
   filter_length: 1280
   hop_length: 320
@@ -44,7 +44,7 @@ data:
   num_workers: 0
   # For pitch extraction, set the pitch_predictor (will compute in dataloader) or pitch_features_dir (will load from disk)
   pitch_predictor: rmvpe # pm | crepe | harvest | dio | rmvpe | fcpe
-  pitch_features_dir: ${data.dataset_dir}/pitch_features/train 
+  pitch_features_dir: ${data.dataset_dir}/pitch_features/train
   sampling_rate: 24000
   spectrogram_dir: null #${data.dataset_dir}/spectrograms # it is recommended NOT to use if you have small disk space
   # For speaker embedding extraction, set the use_spk_emb to True and spk_embeddings_dir (will load from disk) or configure the model to compute it on forward
@@ -58,10 +58,10 @@ data:
   validation_files: ${data.dataset_dir}/valid.csv
   win_length: 1280
 
-model: 
+model:
   save_dir: null
   filter_channels: 768
-  finetune_from_model: 
+  finetune_from_model:
     discriminator: null
     generator: null
   hidden_channels: 192

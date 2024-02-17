@@ -4,6 +4,10 @@
 # Dataset
 dataset
 
+# Model weights
+WavLM-Large.pt
+generator_v1
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,5 +1,5 @@
 path: ./logs/${hydra.job.config_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
-  
+
 log_level: INFO
 seed: 1
 tb_log_dir: tensorboard
@@ -7,7 +7,7 @@ tqdm: true
 
 hydra:
   run:
-    dir: ${path} 
+    dir: ${path}
   job_logging:
     formatters:
       colorlog:
@@ -15,7 +15,7 @@ hydra:
           - %(message)s'
     handlers:
       file:
-        filename: ${hydra.run.dir}/${hydra.job.name}_${now:%Y-%m-%d}_${now:%H-%M-%S}.log  
+        filename: ${hydra.run.dir}/${hydra.job.name}_${now:%Y-%m-%d}_${now:%H-%M-%S}.log
 
 defaults:
   - override hydra/job_logging: colorlog
