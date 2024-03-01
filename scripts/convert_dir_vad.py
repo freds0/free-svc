@@ -20,7 +20,7 @@ import sys
 sys.path.append(".")
 sys.path.append("..")
 
-import utils    
+import utils
 from models.speaker_encoder.voice_encoder import SpeakerEncoder
 from models import SynthesizerTrn
 from mel_processing import MelProcessing
@@ -175,7 +175,7 @@ if __name__ == "__main__":
             # get source audios
             speech_frames = return_speech_segments(
                 vad_model_and_utils, src, use_cuda=True)
-            
+
             # src
             wav_src_all, _ = librosa.load(src, sr=hps.data.sampling_rate)
             if not speech_frames:
@@ -200,12 +200,12 @@ if __name__ == "__main__":
                     pitch = torch.nn.functional.interpolate(torch.tensor(pitch).unsqueeze(0).unsqueeze(
                         0), size=z_len, mode="nearest").squeeze().unsqueeze(0).unsqueeze(0).cuda()
 
-                    audio = net_g.voice_conversion(c_src=None, 
-                                                y_src=wav_src, 
-                                                y_tgt=wav_tgt, 
-                                                g_tgt=None, 
-                                                mel_tgt=None, 
-                                                c_lengths=None, 
+                    audio = net_g.voice_conversion(c_src=None,
+                                                y_src=wav_src,
+                                                y_tgt=wav_tgt,
+                                                g_tgt=None,
+                                                mel_tgt=None,
+                                                c_lengths=None,
                                                 pitch_tgt=pitch)
                     audio = audio[0][0].data.cpu().float().numpy()
                     if i == 0:

@@ -155,7 +155,7 @@ def compute_mask_indices(
         if len(mask_idc) > min_len:
             mask_idc = np.random.choice(mask_idc, min_len, replace=False)
         mask[i, mask_idc] = True
-    
+
     return mask
 
 
@@ -305,7 +305,7 @@ class WavLM(nn.Module):
                 .expand(-1, T, -1)
             )
             x[mask_channel_indices] = 0
-        
+
         return x, mask_indices
 
     def forward_padding_mask(
@@ -343,7 +343,7 @@ class WavLM(nn.Module):
 
         if padding_mask is not None:
             padding_mask = self.forward_padding_mask(features, padding_mask)
-        
+
         if self.post_extract_proj is not None:
             features = self.post_extract_proj(features)
 
@@ -355,7 +355,7 @@ class WavLM(nn.Module):
             )
         else:
             x = features
-        
+
         # feature: (B, T, D), float
         # target: (B, T), long
         # x: (B, T, D), float
@@ -366,7 +366,7 @@ class WavLM(nn.Module):
             padding_mask=padding_mask,
             layer=None if output_layer is None else output_layer - 1
         )
-        
+
         res = {"x": x, "padding_mask": padding_mask, "features": features, "layer_results": layer_results}
 
         feature = res["features"] if ret_conv else res["x"]
@@ -563,7 +563,7 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, x, padding_mask=None, streaming_mask=None, layer=None):
         x, layer_results = self.extract_features(x, padding_mask, streaming_mask, layer)
-        
+
         if self.layer_norm_first and layer is None:
             x = self.layer_norm(x)
 
@@ -573,7 +573,7 @@ class TransformerEncoder(nn.Module):
 
         if padding_mask is not None:
             x[padding_mask] = 0
-        
+
         x_conv = self.pos_conv(x.transpose(1, 2))
         x_conv = x_conv.transpose(1, 2)
         x += x_conv

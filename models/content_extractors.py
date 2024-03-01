@@ -16,7 +16,7 @@ from transformers import HubertModel
 
 class SpinModelFeatureExtractor(nn.Module):
     def __init__(self, config, checkpoint_path, freeze=True, svc_model_sr=16000):
-        super().__init__() 
+        super().__init__()
         if isinstance(config, str) and config.split(".")[-1] in {"yaml", "yml"}:
             config = yaml.load(open(config, "r"), Loader=yaml.FullLoader)
         self.model = SpinModel(config)
@@ -100,7 +100,7 @@ class WavLMFeatureExtractor(WavLM):
 
         c = c.transpose(1, 2)
 
-        # This is necessary because the features in the time dimension has one element 
+        # This is necessary because the features in the time dimension has one element
         # less than other features:
         c_padded = torch.zeros((c.shape[0], c.shape[1], c.shape[2]+1), device=c.device)
         c_padded[:, :, :-1] = c

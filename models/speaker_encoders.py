@@ -1,5 +1,5 @@
 import torch
-import torchaudio 
+import torchaudio
 import librosa
 import logging
 
@@ -7,7 +7,7 @@ from torch import nn
 
 from .speaker_encoder.audio import wav_to_mel_spectrogram
 from .speaker_encoder.audio import preprocess_wav as speaker_encoder_preprocess
-from .speaker_encoder.voice_encoder import SpeakerEncoder 
+from .speaker_encoder.voice_encoder import SpeakerEncoder
 
 from .ssl_singer_identity.singer_identity import load_model as load_ssl_singer_identity_model
 
@@ -15,7 +15,7 @@ try:
     from TTS.tts.utils.speakers import SpeakerManager
 except ImportError:
     logging.warning("TTS is not installed, COQUI speaker encoder will not be available")
-    
+
 from .clova.models.RawNet3 import MainModel as RawNet3
 from .clova.SpeakerNet import SpeakerNet
 
@@ -23,7 +23,7 @@ from huggingface_hub import hf_hub_download
 
 
 class ECAPA2SpeakerEncoder16k(nn.Module):
-    
+
     def __init__(self, device, spk_encoder_ckpt='Jenthe/ECAPA2', half=False):
         super().__init__()
         self.device = device
@@ -36,15 +36,15 @@ class ECAPA2SpeakerEncoder16k(nn.Module):
         audio, _ = librosa.load(filepath, sr=16000, mono=True)
         with torch.jit.optimized_execution(False):
             return self.speaker_encoder(torch.from_numpy(audio).to(self.device).unsqueeze(0)).detach().cpu()
-        
+
     @property
     def model(self):
         return self.speaker_encoder
-    
+
     @property
     def embedding_dim(self):
         return 192
-    
+
     def forward(self, x):
         return self.speaker_encoder(x)
 
@@ -57,15 +57,15 @@ class ByolSpeakerEncoder(nn.Module):
 
     def get_speaker_embedding(self, filepath):
         return self.speaker_encoder(filepath)
-    
+
     @property
     def model(self):
         return self.speaker_encoder
-    
+
     @property
     def embedding_dim(self):
         return 1000
-    
+
     def forward(self, x):
         return self.speaker_encoder(x)
 
@@ -83,15 +83,15 @@ class RawNet3SpeakerEncoder44k(nn.Module):
     def get_speaker_embedding(self, filepath):
         audio, _ = librosa.load(filepath, sr=44100, mono=True)
         return self.speaker_encoder(torch.from_numpy(audio).to(self.device)).detach().cpu()
-    
+
     @property
     def model(self):
         return self.speaker_encoder
-    
+
     @property
     def embedding_dim(self):
         return 256
-    
+
     def forward(self, x):
         return self.speaker_encoder(x)
 
@@ -120,19 +120,19 @@ class CoquiSpeakerEncoder(nn.Module):
             spk_waveform = waveform
 
         return self.speaker_encoder.forward(spk_waveform.contiguous(), l2_norm=True).unsqueeze(-1)
-    
+
     @property
     def model(self):
         return self.speaker_encoder
-    
+
     @property
     def embedding_dim(self):
         return 512
-    
+
     def forward(self, x):
         return self.speaker_encoder(x)
-    
-    
+
+
 class DefaultSpeakerEncoder(nn.Module):
 
     def __init__(self, device):
@@ -142,14 +142,14 @@ class DefaultSpeakerEncoder(nn.Module):
 
     def get_speaker_embedding(self, filepath):
         return self.speaker_encoder.get_embedding(filepath)
-    
+
     @property
     def model(self):
         return self.speaker_encoder
-    
+
     @property
     def embedding_dim(self):
         return 256
-    
+
     def forward(self, x):
         return self.speaker_encoder(x)

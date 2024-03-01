@@ -17,11 +17,11 @@ if __name__ == "__main__":
 
     if args.seed is not None:
         random.seed(args.seed)
-    
+
     train = []
     val = []
     test = []
-    idx = 0 
+    idx = 0
 
     data = []
     for language in os.listdir(args.source_dir):
@@ -51,16 +51,15 @@ if __name__ == "__main__":
         with open(args.train_list, "w") as f:
             for wavpath, language, speaker in tqdm(train):
                 print(wavpath, language, speaker, sep="|", file=f)
-    
+
     if args.val_list != "":
         print("Writing", args.val_list)
         with open(args.val_list, "w") as f:
             for wavpath, language, speaker in tqdm(val):
                 print(wavpath, language, speaker, sep="|", file=f)
-            
+
     if args.test_list != "":
         print("Writing", args.test_list)
         with open(args.test_list, "w") as f:
             for wavpath, language, speaker in tqdm(test):
                 print(wavpath, language, speaker, sep="|", file=f)
-            

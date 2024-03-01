@@ -77,7 +77,7 @@ class AudioVADSplitter:
         new_speech_timestamps = map_timestamps_to_new_sr(
             self.vad_sample_rate, orig_sample_rate, speech_timestamps, trim_just_beginning_and_end
         )
-        
+
         return orig_wav, orig_sample_rate, new_speech_timestamps
 
     def __call__(self, audio_path, out_dir=None):
@@ -88,16 +88,16 @@ class AudioVADSplitter:
 
         orig_wav, orig_sample_rate, new_timestamps = self.get_new_speech_timestamps(audio_path)
         orig_wav = orig_wav.cpu().numpy()
-        
+
         prefix = os.path.splitext(os.path.basename(audio_path))[0]
         os.makedirs(os.path.join(out_dir, prefix), exist_ok=True)
         for tp in new_timestamps:
             s = tp["start"]
             e = tp["end"]
-            
+
             out_path = os.path.join(out_dir, prefix, f"{prefix}_{s}_{e}.wav")
             if (e-s)//orig_sample_rate < self.min_sec:
-                print(f"Ignoring {e//orig_sample_rate}:{s//orig_sample_rate} (< {self.min_sec})")            
+                print(f"Ignoring {e//orig_sample_rate}:{s//orig_sample_rate} (< {self.min_sec})")
             elif (e-s)//orig_sample_rate > self.max_sec:
                 print(f"Ignoring {e//orig_sample_rate}:{s//orig_sample_rate} (> {self.max_sec})")
             else:
@@ -123,10 +123,10 @@ if __name__ == "__main__":
         raise ValueError("Must specify either files or dir")
 
     spliter = AudioVADSplitter(
-        device=args.device, 
-        out_dir=args.out_dir, 
-        min_sec=args.min_sec, 
-        max_sec=args.max_sec, 
+        device=args.device,
+        out_dir=args.out_dir,
+        min_sec=args.min_sec,
+        max_sec=args.max_sec,
         threshold=args.threshold
     )
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print("Error:", e, file=sys.stderr)
     elif args.dir:
-        for spk_dir in os.listdir(args.dir): 
+        for spk_dir in os.listdir(args.dir):
             for root, subfolders, files in os.walk(args.dir):
                 for file in list(filter(lambda f: f.endswith('wav'), files)):
                     fp = os.path.join(root, file)

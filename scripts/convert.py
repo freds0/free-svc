@@ -100,7 +100,7 @@ if __name__ == "__main__":
             z_len = round(audio.shape[-1] / hps.data.hop_length)
             pitch = torch.nn.functional.interpolate(torch.tensor(pitch).unsqueeze(0).unsqueeze(
                 0), size=z_len, mode="nearest").squeeze().unsqueeze(0).unsqueeze(0).cuda()
-            
+
             # TODO: explore other interpolation modes
             c = torch.nn.functional.interpolate(
                 c, size=z_len, mode="nearest").cuda()
