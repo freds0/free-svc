@@ -2,21 +2,21 @@ defaults:
 - common
 
 train:
-  batch_size: 64
+  batch_size: 128
   betas: [0.8, 0.99]
   c_kl: 1.0
   c_mel: 45
   distributed: false  # BUG: multi-gpu is not working
   use_multiprocessing: false # BUG: multi-gpu is not working
-  epochs: 10
+  epochs: 20
   eps: 1e-9
   fp16_run: false
   init_lr_ratio: 1
-  raise_error: true
+  raise_error: false
   learning_rate: 2e-4
   log_interval: 10
   log_level: ${log_level}
-  lr_decay: 0.999875
+  lr_decay: 0.98
   max_speclen: 128
   port: 8005
   resume_training: false  # set to false to finetune from a model
@@ -34,17 +34,17 @@ train:
   weighted_batch_lang_sampling : 0.5
 
 data:
-  dataset_dir: data
+  dataset_dir: /raid/lucasgris/free-svc/data
   filter_length: 1280
   hop_length: 320
   max_wav_value: 32768.0
   mel_fmax: null
   mel_fmin: 0.0
   n_mel_channels: 80
-  num_workers: 0
+  num_workers: 64
   # For pitch extraction, set the pitch_predictor (will compute in dataloader) or pitch_features_dir (will load from disk)
   pitch_predictor: rmvpe # pm | crepe | harvest | dio | rmvpe | fcpe
-  pitch_features_dir: ${data.dataset_dir}/pitch_features/train
+  pitch_features_dir: ${data.dataset_dir}/pitch_features/
   sampling_rate: 24000
   spectrogram_dir: null #${data.dataset_dir}/spectrograms # it is recommended NOT to use if you have small disk space
   # For speaker embedding extraction, set the use_spk_emb to True and spk_embeddings_dir (will load from disk) or configure the model to compute it on forward
@@ -54,16 +54,16 @@ data:
   sr_min_max: [68, 92]
   # For content feature extraction, set the content_feature_dir (will load from disk) or configure the model to compute it on forward
   content_feature_dir: null
-  training_files: ${data.dataset_dir}/train.csv
-  validation_files: ${data.dataset_dir}/valid.csv
+  training_files: data/train.csv
+  validation_files: data/valid.csv
   win_length: 1280
 
 model:
   save_dir: null
   filter_channels: 768
   finetune_from_model:
-    discriminator: null
-    generator: null
+    discriminator: /raid/lucasgris/free-svc/D-freevc-24.pth
+    generator: /raid/lucasgris/free-svc/freevc-24.pth
   hidden_channels: 192
   inter_channels: 192
   kernel_size: 3
@@ -83,7 +83,7 @@ model:
   device: cuda
   # For online speaker embedding extraction, set the use_spk_emb to True and spk_encoder_type
   use_spk_emb: false
-  gin_channels: null # gin_channels = spk_encoder.embedding_dim 
+  gin_channels: null # gin_channels = spk_encoder.embedding_dim
   spk_encoder_type: null # ECAPA2SpeakerEncoder16k |
   # For content feature extraction, set the content_encoder_type and content_encoder_ckpt
   content_encoder_type: null # load from disk (data) - hubert | wavlm

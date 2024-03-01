@@ -481,10 +481,10 @@ class FeatureAudioSpeakerLoader(torch.utils.data.Dataset):
                     pitch = pitch[0]
                 os.makedirs(os.path.dirname(pitch_path), exist_ok=True)
                 torch.save(torch.tensor(pitch), pitch_path)
-            else:
-                raise Exception(f"Pitch feature not found at {pitch_path}. "
-                                "Please run preprocess_pitch.py to generate pitch features "
-                                "or set pitch_features_dir to None (will compute during training).")
+            # else:
+            #     raise Exception(f"Pitch feature not found at {pitch_path}. "
+            #                     "Please run preprocess_pitch.py to generate pitch features "
+            #                     "or set pitch_features_dir to None (will compute during training).")
         elif self.pitch_predictor is not None:
             #_, _, _, pitch, _ = self.pitch_predictor(wavfile.read(audio_path)[1], self.sampling_rate)
             pitch = self.pitch_predictor.compute_f0(wavfile.read(audio_path)[1])
@@ -551,9 +551,12 @@ class FeatureAudioSpeakerCollate():
         batch = []
         for fp, lang, spk in batch_files_and_speakers:
             self.logger.debug(f"fp: {fp}, lang: {lang}, spk: {spk}")
-            b = self.dataset.get_audio_and_features((fp, lang, spk))
-            b.append(fp)
-            batch.append(b.copy())
+            try:
+                b = self.dataset.get_audio_and_features((fp, lang, spk))
+                b.append(fp)
+                batch.append(b.copy())
+            except:
+                self.logger.error(fp)
 
         _, ids_sorted_decreasing = torch.sort(
             torch.LongTensor([x[1].size(1) for x in batch]),

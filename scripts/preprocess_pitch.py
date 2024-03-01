@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     pitch_predictor = get_f0_predictor(
         args.pitch_predictor,
-        sampling_rate=args.sampling_rate, 
+        sampling_rate=args.sampling_rate,
         hop_length=args.hop_length,
         device=args.device,
         threshold=0.05
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     file_paths = glob(f'{args.in_dir}/**/*.wav', recursive=True)
     random.shuffle(file_paths)
-    
+
     if args.num_workers > 1:
         with concurrent.futures.ProcessPoolExecutor(args.num_workers) as \
                 executor:
@@ -56,6 +56,6 @@ if __name__ == "__main__":
                 if f.exception() is not None:
                     print(f.exception())
     else:
-        for file_path in tqdm(file_paths):    
+        for file_path in tqdm(file_paths):
             output_path = file_path.replace(args.in_dir, args.out_dir).replace(".wav", "_pitch.pt")
             extract_pitch(pitch_predictor, file_path, output_path, args.skip_existing)
