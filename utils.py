@@ -53,6 +53,9 @@ class HParams():
   def __repr__(self):
     return self.__dict__.__repr__()
 
+  def get(self, key, default=None):
+    return getattr(self, key, default)
+
 def get_cmodel(rank, checkpoint_path="wavlm/WavLM-Large.pt"):
     checkpoint = torch.load(checkpoint_path)
     cfg = WavLMConfig(checkpoint['cfg'])

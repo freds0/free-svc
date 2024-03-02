@@ -579,3 +579,34 @@ class SynthesizerTrn(nn.Module):
         o = self.dec(z * c_mask, g=g)
 
         return o
+
+    def voice_conversion(self, c_src=None, y_src=None, y_tgt=None, g_tgt=None, mel_tgt=None, c_lengths=None, pitch_tgt=None, lang_id_src=None):
+        if c_src is None:
+            if self.c_model is None:
+                raise ValueError("c_src is None and c_model is also None")
+            if y_src is None:
+                raise ValueError("c_src is None and y_src is also None")
+            with torch.no_grad():
+                c_src = self.c_model.extract_features(y_src)
+        # c is smaller than pitch so pad c to the size of pitch on dim 2 (time dimention). Uses pitch on inference because mel spec is from target speaker not source
+        if c_src.size(2) != pitch_tgt.size(2):
+            c_src = torch.nn.functional.interpolate(
+                    c_src.unsqueeze(1), size=[c_src.size(1), pitch_tgt.size(2)], mode="nearest").squeeze(1)
+            # reset c_lenghts
+            c_lengths = (torch.ones(c_src.size(0)) * c_src.size(-1)).to(c_src.device)
+
+        if c_lengths == None:
+            c_lengths = (torch.ones(c_src.size(0)) * c_src.size(-1)).to(c_src.device)
+
+        if g_tgt is None:
+            g_tgt = self.get_spk_emb(y_tgt, mel_tgt)
+        assert g_tgt is not None, "g is None. Check configuration of speaker encoder model or g input on forward method"
+
+        if self.coarse_f0:
+            pitch_tgt = f0_to_coarse(pitch_tgt).detach()
+
+        z_p, _, _, c_mask = self.enc_p(c_src, c_lengths, f0=pitch_tgt if not self.cond_f0_on_flow else None, lang_id=lang_id_src)
+        z = self.flow(z_p, c_mask, g=g_tgt, pitch=pitch_tgt.float() if self.cond_f0_on_flow else None, reverse=True)
+        o = self.dec(z * c_mask, g=g_tgt)
+
+        return o
