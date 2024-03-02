@@ -99,13 +99,6 @@ def return_speech_segments(
     if use_cuda:
         wav_vad = wav_vad.cuda()
 
-    # wav_vad = wav_vad.unsqueeze(0).unsqueeze(0)
-
-    print("-"*100)
-    print(wav_vad.shape)
-    print(wav_vad.shape[-1]/vad_sample_rate)
-    print("-"*100)
-
     # get speech timestamps from full audio file
     speech_timestamps = get_speech_timestamps(
         wav_vad,
@@ -176,21 +169,18 @@ def main():
     if args.ignore_metadata_header:
         rawrows = rawrows[1:]
     for rawrow in tqdm(rawrows, desc="Processing metadata"):
-        src, lang_src, speaker_src, transcript, speaker_tgt, lang_tgt = rawrow
+        if len(rawrow) == 6:
+            src, lang_src, speaker_src, transcript, speaker_tgt, lang_tgt = rawrow
+        elif len(rawrow) == 5:
+            src, lang_src, speaker_src, speaker_tgt, lang_tgt = rawrow
+        else:
+            raise ValueError(f"Invalid number of columns in metadata: {len(rawrow)}")
+
         srcs.append(src)
         lang_srcs.append(lang_src)
         speaker_srcs.append(speaker_src)
         speaker_tgts.append(speaker_tgt)
         lang_tgts.append(lang_tgt)
-
-    # limit number of samples
-    # limit_samples = 5
-    # start = 1000
-    # srcs = srcs[start:start+limit_samples]
-    # lang_srcs = lang_srcs[start:start+limit_samples]
-    # speaker_srcs = speaker_srcs[start:start+limit_samples]
-    # speaker_tgts = speaker_tgts[start:start+limit_samples]
-    # lang_tgts = lang_tgts[start:start+limit_samples]
 
     print("Synthesizing...")
     all_audios = []
