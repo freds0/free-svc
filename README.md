@@ -8,7 +8,7 @@
 
 3. Run the shel script prepare_{name}_dataset.sh to download and preprocess the dataset.
 
-4. Download Wavlm large model from https://github.com/microsoft/unilm/tree/master/wavlm and put it in the directory models/wavlm/;
+4. Download WavLM Large model from https://github.com/microsoft/unilm/tree/master/wavlm and put it in the directory models/wavlm/;
 
 5. Download HifiGAN model from https://github.com/jik876/hifi-gan and put it in the directory models/hifigan/;
 
