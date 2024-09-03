@@ -14,12 +14,7 @@
 
 6. Run the following command to train the model:
 ```
-python train.py --config-dir configs --config-name sovits-online_hubert data.dataset_dir={dataset_dir} 
+python train.py --config-dir configs --config-name sovits-online_hubert data.dataset_dir={dataset_dir}
 ```
 
 7. Convert some audios using the scripts convert.py and convert_dir_vad.py in the scripts directory.
-
-## TODO
-
-- [ ] Test docker image creation again
-- [ ] Test conversion scripts
