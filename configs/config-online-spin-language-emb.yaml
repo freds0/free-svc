@@ -4,16 +4,20 @@ defaults:
 
 data:
   use_lang_emb: true
-  num_langs: 7
+  num_langs: 11
   lang_dim: 192 # same size as hidden_channels to facilitate the addition
   lang2id:
-    es: 0 # spanish
-    pt: 1 # portuguese
-    pl: 2 # polish
-    it: 3 # italian
-    de: 4 # german
-    fr: 5 # french
-    nl: 6 # dutch
+    chinese: 0
+    dutch: 1
+    english: 2
+    french: 3
+    german: 4
+    italian: 5
+    japanese: 6
+    other: 7
+    polish: 8
+    portuguese: 9
+    spanish: 10
   use_spk_emb: false
   spk_embeddings_dir: null # compute on forward (model)
   spk_encoder_type: null # compute on forward (model) | ECAPA2SpeakerEncoder16k

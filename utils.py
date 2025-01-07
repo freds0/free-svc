@@ -28,7 +28,7 @@ class HParams():
       if type(v) == dict:
         v = HParams(**v)
       self[k] = v
-    
+
   def keys(self):
     return self.__dict__.keys()
 
@@ -52,7 +52,10 @@ class HParams():
 
   def __repr__(self):
     return self.__dict__.__repr__()
-  
+
+  def get(self, key, default=None):
+    return getattr(self, key, default)
+
 def get_cmodel(rank, checkpoint_path="wavlm/WavLM-Large.pt"):
     checkpoint = torch.load(checkpoint_path)
     cfg = WavLMConfig(checkpoint['cfg'])
@@ -100,7 +103,7 @@ def load_weights(model, checkpoint_path, strict=False):
     model = torch.nn.DataParallel(model)
     model.load_state_dict(checkpoint['model'], strict=strict)
     return model
-    
+
 def load_checkpoint(checkpoint_path, model, optimizer=None, strict=False):
     assert os.path.isfile(checkpoint_path)
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')

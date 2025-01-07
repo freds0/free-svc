@@ -33,7 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--out-dir", type=str, default="data/content_features", help="path to output dir")
     parser.add_argument("--checkpoint", type=str, default="./models/wavlm/WavLM-Large.pt", help="path to checkpoint")
     args = parser.parse_args()
-    
+
     os.makedirs(args.out_dir, exist_ok=True)
 
     print("Loading WavLM for content...")
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     cmodel.load_state_dict(checkpoint['model'])
     cmodel.eval()
     print("Loaded WavLM.")
-    
+
     sub_folder_list = os.listdir(args.in_dir)
     sub_folder_list.sort()
     for spk in sub_folder_list:
@@ -53,9 +53,8 @@ if __name__ == "__main__":
             continue
 
         filepaths = glob(f'{in_dir}/**/*.wav', recursive=True)
-        
+
         for filepath in tqdm(filepaths):
             spk_out_dir = os.path.join(args.out_dir, spk)
             os.makedirs(spk_out_dir, exist_ok=True)
             extract_and_save_content_features(filepath, spk_out_dir, sampling_rate=args.sr)
-    

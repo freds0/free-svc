@@ -111,13 +111,13 @@ class DDSConv(nn.Module):
 
 
 class WN(torch.nn.Module):
-    def __init__(self, 
-                 hidden_channels, 
-                 kernel_size, 
-                 dilation_rate, 
-                 n_layers, 
-                 gin_channels=0, 
-                 pitch_channels=0, 
+    def __init__(self,
+                 hidden_channels,
+                 kernel_size,
+                 dilation_rate,
+                 n_layers,
+                 gin_channels=0,
+                 pitch_channels=0,
                  p_dropout=0):
         super(WN, self).__init__()
         assert(kernel_size % 2 == 1)

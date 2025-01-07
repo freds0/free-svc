@@ -23,13 +23,13 @@ def process(args, audio_path, vocoder, cmodel, wav_dir, ssl_dir, hps):
     wav, _ = librosa.load(audio_path, sr=hps.sampling_rate)
     wav = torch.from_numpy(wav).unsqueeze(0).cuda()
     mel = mel_processing.mel_spectrogram_torch(
-        wav, 
-        hps.n_fft, 
-        hps.num_mels, 
-        hps.sampling_rate, 
-        hps.hop_size, 
-        hps.win_size, 
-        hps.fmin, 
+        wav,
+        hps.n_fft,
+        hps.num_mels,
+        hps.sampling_rate,
+        hps.hop_size,
+        hps.win_size,
+        hps.fmin,
         hps.fmax
     )
     for i in range(args.min, args.max+1):
@@ -55,7 +55,7 @@ def process(args, audio_path, vocoder, cmodel, wav_dir, ssl_dir, hps):
                 wav_path,
                 args.sr,
                 _wav_rs
-            )     
+            )
 
 def main(args, filepaths, spk, pbar=True):
     print("Preprocessing {} ...".format(spk))
@@ -71,7 +71,7 @@ def main(args, filepaths, spk, pbar=True):
     vocoder = utils.get_vocoder(0)
     vocoder.eval()
     print("Loaded vocoder.")
-    
+
     config_path = args.config
     with open(config_path, "r") as f:
         data = f.read()
@@ -88,7 +88,7 @@ def main(args, filepaths, spk, pbar=True):
         if not pbar:
             print(f"[{i+1}/{len(filepaths)}] Processing {filepath}")
         try:
-            process(args, filepath, vocoder, cmodel, spk_wav_out_dir, 
+            process(args, filepath, vocoder, cmodel, spk_wav_out_dir,
                     spk_ssl_out_dir, hps)
             print(f"Processed {filepath}")
         except Exception as e:

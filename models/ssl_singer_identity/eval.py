@@ -500,7 +500,7 @@ if __name__ == "__main__":
                 model = load_id_extractor(model_file, source)
             except:
                 raise ValueError(f"Could not load model {model_file} from {source}")
-            
+
         print(f"Model {model_file} loaded successfully")
 
         model.eval()
