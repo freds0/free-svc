@@ -158,6 +158,10 @@ python scripts/convert_dir_vad.py --hpfile path/to/config.yaml \
 - **Pitch Adjustment**: Use the pitch factor parameter to control pitch modification during conversion
 - **Audio Concatenation**: Enable `--concat-audio` to combine all converted segments into a single file
 
+## Pretrained Models
+
+**The pretrained models will be made publicly available in the near future.**
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
