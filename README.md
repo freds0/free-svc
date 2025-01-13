@@ -108,59 +108,76 @@ FreeSVC is trained on a diverse set of speech and singing datasets covering mult
 #### Single Audio File Conversion
 
 ```bash
-python scripts/convert.py --hpfile path/to/config.yaml \
-                         --ptfile path/to/checkpoint.pth \
-                         --txt-path path/to/convert.txt \
-                         --out-dir path/to/output_dir \
-                         [--use-timestamp]
+python scripts/inference.py --hpfile path/to/config.yaml \
+                   --ptfile path/to/checkpoint.pth \
+                   --input-base-dir path/to/input/directory \
+                   --metadata-path path/to/metadata.csv \
+                   --spk-emb-base-dir path/to/speaker/embeddings \
+                   --out-dir path/to/output_directory \
+                   [--use-vad] \
+                   [--use-timestamp] \
+                   [--concat-audio] \
+                   [--pitch-factor PITCH_FACTOR]
 ```
 
 **Parameters:**
-- `--hpfile`: Configuration file path (Default: configs/freevc.yaml)
-- `--ptfile`: Model checkpoint file path (Default: checkpoints/freevc.pth)
-- `--txt-path`: Conversion instructions file path
-- `--out-dir`: Output directory (Default: output/freevc)
-- `--use-timestamp`: (Optional) Add timestamp to output filenames
+- `--hpfile: Path to the configuration YAML file
+- --ptfile: Path to the model checkpoint file
+- --input-base-dir: Base directory containing source audio files
+- --metadata-path: Path to the CSV metadata file
+- --spk-emb-base-dir: Directory containing speaker embeddings
+- --out-dir: Output directory for converted audio (default: "gen-samples/")
 
-**Example convert.txt format:**
+**Optional Parameters:**
+- --pitch-predictor: Pitch predictor model type (default: "rmvpe")
+- --use-vad: Enable Voice Activity Detection for better segmentation
+- --use-timestamp: Add timestamps to output filenames
+- --concat-audio: Concatenate all converted segments into a single file
+- --pitch-factor: Adjust pitch modification factor (default: 0.9544)
+- --ignore-metadata-header: Skip first row of metadata CSV (default: True)
+
+**Metadata CSV Format:**
 ```
-song1|path/to/source1.wav|path/to/target1.wav
-song2|path/to/source2.wav|path/to/target2.wav
-```
-
-#### Batch Conversion with VAD
-
-```bash
-python scripts/convert_dir_vad.py --hpfile path/to/config.yaml \
-                                 --ptfile path/to/checkpoint.pth \
-                                 --reference path/to/reference.wav \
-                                 --in-dir path/to/input_directory \
-                                 --out-dir path/to/output_directory \
-                                 [--use-timestamp] \
-                                 [--concat-audio] \
-                                 [--pitch-factor PITCH_FACTOR]
+source_path|source_lang|source_speaker|target_speaker|target_lang
+./audio/source1.wav|en|speaker1|speaker2|ja
+./audio/source2.wav|zh|speaker3|speaker4|en
 ```
 
-**Parameters:**
-- `--hpfile`: Configuration file path (Required)
-- `--ptfile`: Model checkpoint file path (Required)
-- `--reference`: Reference speaker's WAV file path (Required)
-- `--pitch-predictor`: Pitch predictor model (Default: rmvpe)
-- `--in-dir`: Input WAV files directory (Default: dataset/test/audio)
-- `--out-dir`: Output directory (Default: gen-samples/)
-- `--use-timestamp`: (Optional) Add timestamp to output filenames
-- `--concat-audio`: (Optional) Concatenate all converted segments
-- `--pitch-factor`: (Optional) Pitch adjustment factor (Default: 0.9544)
+Required columns:
+
+- source_path: Path to source audio file (relative to input-base-dir)
+- source_lang: Source language code (e.g., 'en', 'ja', 'zh')
+- source_speaker: Source speaker identifier
+- target_speaker: Target speaker identifier
+- target_lang: Target language code
+- transcript: (Optional) Text transcript of the audio
+
+**Output Directory Structure**
+The converted audio files will be organized in the following structure:
+```
+output_dir/
+└── metadata_name/
+    └── source_lang/
+        └── target_lang/
+            └── source_speaker/
+                └── target_speaker/
+                    └── converted_audio.wav
+```
 
 ### Additional Notes
 
-- **Voice Activity Detection (VAD)**: The batch conversion script uses VAD to detect and segment speech within input audio files
-- **Pitch Adjustment**: Use the pitch factor parameter to control pitch modification during conversion
-- **Audio Concatenation**: Enable `--concat-audio` to combine all converted segments into a single file
-
+- **Voice Activity Detection (VAD)**: When VAD is enabled using the `--use-vad` flag, the system performs intelligent speech segmentation on the input audio. It automatically detects and isolates speech segments for processing while maintaining non-speech portions of the audio. Each detected speech segment is processed independently, and the system then reconstructs the full audio by concatenating all segments in their original order. This approach ensures high-quality conversion while preserving the natural rhythm and timing of the original audio.
+  
+- **Pitch Adjustment**: The system offers precise pitch control through the `--pitch-factor parameter`, which defaults to 0.9544. This factor acts as a multiplier for the output pitch, where values greater than 1 will increase the pitch of the converted voice, while values less than 1 will lower it. Users can fine-tune this parameter to achieve the desired pitch characteristics in the converted audio.
+  
+- **Audio Concatenation**: The `--concat-audio` option provides a convenient way to combine multiple conversions into a single audio file. When enabled, the system will automatically merge all converted segments into one continuous audio file, saved as "all.wav" in the output directory. This feature is particularly useful when processing multiple short segments that belong together or when creating a compilation of converted audio.
 ## Pretrained Models
 
 **The pretrained models will be made publicly available in the near future.**
+
+The pretrained weights for FreeSVC are available on the Hugging Face Model Hub at [alefiury/free-svc](https://huggingface.co/alefiury/free-svc)
+
+Pretrained 
 
 ## License
 
