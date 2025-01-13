@@ -177,8 +177,6 @@ output_dir/
 
 ## Pretrained Models
 
-**The pretrained models will be made publicly available in the near future.**
-
 The pretrained weights for FreeSVC are available on the Hugging Face Model Hub at [alefiury/free-svc](https://huggingface.co/alefiury/free-svc).
 
 ### Available Files
