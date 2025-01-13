@@ -105,7 +105,7 @@ FreeSVC is trained on a diverse set of speech and singing datasets covering mult
 
 ### Audio Conversion
 
-#### Single Audio File Conversion
+This section explains how to use the FreeSVC model for audio conversion. 
 
 ```bash
 python scripts/inference.py --hpfile path/to/config.yaml \
@@ -121,7 +121,7 @@ python scripts/inference.py --hpfile path/to/config.yaml \
 ```
 
 **Parameters:**
-- `--hpfile: Path to the configuration YAML file
+- --hpfile: Path to the configuration YAML file
 - --ptfile: Path to the model checkpoint file
 - --input-base-dir: Base directory containing source audio files
 - --metadata-path: Path to the CSV metadata file
@@ -168,20 +168,32 @@ output_dir/
 
 - **Voice Activity Detection (VAD)**: When VAD is enabled using the `--use-vad` flag, the system performs intelligent speech segmentation on the input audio. It automatically detects and isolates speech segments for processing while maintaining non-speech portions of the audio. Each detected speech segment is processed independently, and the system then reconstructs the full audio by concatenating all segments in their original order. This approach ensures high-quality conversion while preserving the natural rhythm and timing of the original audio.
   
-- **Pitch Adjustment**: The system offers precise pitch control through the `--pitch-factor parameter`, which defaults to 0.9544. This factor acts as a multiplier for the output pitch, where values greater than 1 will increase the pitch of the converted voice, while values less than 1 will lower it. Users can fine-tune this parameter to achieve the desired pitch characteristics in the converted audio.
+- **Pitch Adjustment**: The system offers precise pitch control through the `--pitch-factor parameter`. This factor acts as a multiplier for the output pitch. Users can fine-tune this parameter to achieve the desired pitch characteristics in the converted audio.
   
 - **Audio Concatenation**: The `--concat-audio` option provides a convenient way to combine multiple conversions into a single audio file. When enabled, the system will automatically merge all converted segments into one continuous audio file, saved as "all.wav" in the output directory. This feature is particularly useful when processing multiple short segments that belong together or when creating a compilation of converted audio.
+
 ## Pretrained Models
 
 **The pretrained models will be made publicly available in the near future.**
 
 The pretrained weights for FreeSVC are available on the Hugging Face Model Hub at [alefiury/free-svc](https://huggingface.co/alefiury/free-svc)
 
-Pretrained 
-
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+## Citation
+```
+@misc{ferreira2025freesvczeroshotmultilingualsinging,
+      title={FreeSVC: Towards Zero-shot Multilingual Singing Voice Conversion}, 
+      author={Alef Iury Siqueira Ferreira and Lucas Rafael Gris and Augusto Seben da Rosa and Frederico Santos de Oliveira and Edresson Casanova and Rafael Teixeira Sousa and Arnaldo Candido Junior and Anderson da Silva Soares and Arlindo Galvão Filho},
+      year={2025},
+      eprint={2501.05586},
+      archivePrefix={arXiv},
+      primaryClass={cs.SD},
+      url={https://arxiv.org/abs/2501.05586}, 
+}
+```
 
 ## Acknowledgements
 
