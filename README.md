@@ -4,6 +4,9 @@
 
 </div>
 
+[![arXiv](https://img.shields.io/badge/arXiv-2501.05586-b31b1b.svg)](https://arxiv.org/abs/2501.05586))
+[![HuggingFace badge](https://img.shields.io/badge/%F0%9F%A4%97HuggingFace-Join-yellow)]([https://huggingface.co/CAMB-AI/MARS5-TTS](https://huggingface.co/alefiury/free-svc)
+
 > **This is the official code implementation of FreeSVC [ICASSP 2025]**
 
 ## Introduction
