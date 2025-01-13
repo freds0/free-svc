@@ -185,8 +185,8 @@ The pretrained weights for FreeSVC are available on the Hugging Face Model Hub a
 
 To utilize the pretrained models, download the following files to your local machine:
 
-- [`config-online-spin-language-emb.yaml`](https://huggingface.co/alefiury/free-svc/blob/main/config-online-spin-language-emb.yaml)
-- [`G_00014_0225000.pth`](https://huggingface.co/alefiury/free-svc/blob/main/config-online-spin-language-emb.yaml)
+- [Config File](https://huggingface.co/alefiury/free-svc/blob/main/config-online-spin-language-emb.yaml)
+- [Checkpoint]([https://huggingface.co/alefiury/free-svc/blob/main/config-online-spin-language-emb.yaml](https://huggingface.co/alefiury/free-svc/blob/main/G_00014_0225000.pth))
 
 ## License
 
