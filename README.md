@@ -186,6 +186,8 @@ To utilize the pretrained models, download the following files to your local mac
 - [Config](https://huggingface.co/alefiury/free-svc/blob/main/config-online-spin-language-emb.yaml)
 - [Checkpoint](https://huggingface.co/alefiury/free-svc/blob/main/G_00014_0225000.pth)
 
+The config file must be stored inside the ```configs``` directory, because it has dependencies with other config files.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
