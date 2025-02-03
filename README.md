@@ -94,6 +94,10 @@ FreeSVC is trained on a diverse set of speech and singing datasets covering mult
       - Download from [HifiGAN GitHub Repository](https://github.com/jik876/hifi-gan).
       - Place the downloaded model in `models/hifigan/`.
 
+    - **RMVPE Model:**
+      - Download from [HuggingFace](https://huggingface.co/alefiury/free-svc/blob/main/rmvpe.pt)
+      - Place the downloaded model in `models/f0_predictor/ckpt`
+
 6. **Install Dependencies:**
     ```bash
     pip install -r requirements.txt
@@ -108,7 +112,7 @@ FreeSVC is trained on a diverse set of speech and singing datasets covering mult
 
 ### Audio Conversion
 
-This section explains how to use the FreeSVC model for audio conversion. 
+This section explains how to use the FreeSVC model for audio conversion.
 
 ```bash
 python scripts/inference.py --hpfile path/to/config.yaml \
@@ -170,23 +174,33 @@ output_dir/
 ### Additional Notes
 
 - **Voice Activity Detection (VAD)**: When VAD is enabled using the `--use-vad` flag, the system performs intelligent speech segmentation on the input audio. It automatically detects and isolates speech segments for processing while maintaining non-speech portions of the audio. Each detected speech segment is processed independently, and the system then reconstructs the full audio by concatenating all segments in their original order. This approach ensures high-quality conversion while preserving the natural rhythm and timing of the original audio.
-  
+
 - **Pitch Adjustment**: The system offers precise pitch control through the `--pitch-factor parameter`. This factor acts as a multiplier for the output pitch. Users can fine-tune this parameter to achieve the desired pitch characteristics in the converted audio.
-  
+
 - **Audio Concatenation**: The `--concat-audio` option provides a convenient way to combine multiple conversions into a single audio file. When enabled, the system will automatically merge all converted segments into one continuous audio file, saved as "all.wav" in the output directory. This feature is particularly useful when processing multiple short segments that belong together or when creating a compilation of converted audio.
 
 ## Pretrained Models
 
-The pretrained weights for FreeSVC are available on the Hugging Face Model Hub at [alefiury/free-svc](https://huggingface.co/alefiury/free-svc).
+Pretrained weights for FreeSVC are available on the [Hugging Face Model Hub](https://huggingface.co/alefiury/free-svc). We provide both the backbone model and our fine-tuned multilingual version of SPIN.
 
 ### Available Files
 
 To utilize the pretrained models, download the following files to your local machine:
 
-- [Config](https://huggingface.co/alefiury/free-svc/blob/main/config-online-spin-language-emb.yaml)
-- [Checkpoint](https://huggingface.co/alefiury/free-svc/blob/main/G_00014_0225000.pth)
+- Configuration File: [Download Here](https://huggingface.co/alefiury/free-svc/blob/main/config-online-spin-language-emb.yaml). Place this file in the `configs` directory (it relies on other configuration dependencies).
 
-The config file must be stored inside the ```configs``` directory, because it has dependencies with other config files.
+- Backbone Checkpoint: [Download Here](https://huggingface.co/alefiury/free-svc/blob/main/G_00014_0225000.pth).
+
+- Multilingual SPIN Checkpoint: [Download Here](https://huggingface.co/alefiury/free-svc/blob/main/spin.ckpt). Place this file in the `models/spin` directory.
+
+### Quality Notice
+
+Please be aware that this model is a preliminary release. It has been primarily fine-tuned on speech datasets, which may result in quality limitations. We are actively working on higher-quality models that will address these issues and deliver enhanced performance for both singing and speech conversion in the near future.
+
+## TODO
+
+- [ ] Train a high-quality version exclusively for singing.
+- [ ] Train a high-quality version exclusively for speech.
 
 ## License
 
@@ -195,13 +209,13 @@ This project is licensed under the [MIT License](LICENSE).
 ## Citation
 ```
 @misc{ferreira2025freesvczeroshotmultilingualsinging,
-      title={FreeSVC: Towards Zero-shot Multilingual Singing Voice Conversion}, 
+      title={FreeSVC: Towards Zero-shot Multilingual Singing Voice Conversion},
       author={Alef Iury Siqueira Ferreira and Lucas Rafael Gris and Augusto Seben da Rosa and Frederico Santos de Oliveira and Edresson Casanova and Rafael Teixeira Sousa and Arnaldo Candido Junior and Anderson da Silva Soares and Arlindo Galvão Filho},
       year={2025},
       eprint={2501.05586},
       archivePrefix={arXiv},
       primaryClass={cs.SD},
-      url={https://arxiv.org/abs/2501.05586}, 
+      url={https://arxiv.org/abs/2501.05586},
 }
 ```
 
