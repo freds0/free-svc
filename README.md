@@ -188,6 +188,7 @@ Pretrained weights for FreeSVC are available on the [Hugging Face Model Hub](htt
 To utilize the pretrained models, download the following files to your local machine:
 
 - Configuration File: [Download Here](https://huggingface.co/alefiury/free-svc/blob/main/hyperparams.yaml). Place this file in the `configs` directory (it relies on other configuration dependencies).
+  - Put it alongside [common.yaml](https://huggingface.co/alefiury/free-svc/blob/main/common.yaml) and [config.yaml](https://huggingface.co/alefiury/free-svc/blob/main/config.yaml)
 
 - Backbone Checkpoint: [Download Here](https://huggingface.co/alefiury/free-svc/blob/main/G_00014_0225000.pth).
 
