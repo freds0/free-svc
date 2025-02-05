@@ -212,11 +212,6 @@ The **code** in this repository is licensed under the [MIT License](LICENSE), al
 
 However, the **pre-trained model weights** are subject to dataset-specific restrictions and are licensed under **CC BY-NC-SA (Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License)**. This means that the weights cannot be used for commercial purposes.  
 
-For more details, please review the dataset licenses:
-- [NUS (NHSS)](https://www.smcnus.org/resources)  
-- [Opencpop](https://wenet.org.cn/opencpop/)  
-- [OpenSinger](https://github.com/Music-AI/OpenSinger)  
-
 If you plan to use the pretrained models, please ensure that your use case complies with the dataset restrictions.
 
 ## Citation
