@@ -181,6 +181,9 @@ output_dir/
 
 ## Pretrained Models
 
+> ⚠ **License Notice:**  
+> The pretrained model weights are released under **CC BY-NC-SA** due to dataset licensing restrictions. This means they **cannot** be used for commercial purposes. However, the code itself remains under the MIT License.
+
 Pretrained weights for FreeSVC are available on the [Hugging Face Model Hub](https://huggingface.co/alefiury/free-svc). We provide both the backbone model and our fine-tuned multilingual version of SPIN.
 
 ### Available Files
@@ -205,7 +208,16 @@ Please be aware that this model is a preliminary release. It has been primarily 
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+The **code** in this repository is licensed under the [MIT License](LICENSE), allowing for commercial and unrestricted use.  
+
+However, the **pre-trained model weights** are subject to dataset-specific restrictions and are licensed under **CC BY-NC-SA (Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License)**. This means that the weights cannot be used for commercial purposes.  
+
+For more details, please review the dataset licenses:
+- [NUS (NHSS)](https://www.smcnus.org/resources)  
+- [Opencpop](https://wenet.org.cn/opencpop/)  
+- [OpenSinger](https://github.com/Music-AI/OpenSinger)  
+
+If you plan to use the pretrained models, please ensure that your use case complies with the dataset restrictions.
 
 ## Citation
 ```
