@@ -216,15 +216,16 @@ If you plan to use the pretrained models, please ensure that your use case compl
 
 ## Citation
 ```
-@misc{ferreira2025freesvczeroshotmultilingualsinging,
-      title={FreeSVC: Towards Zero-shot Multilingual Singing Voice Conversion},
-      author={Alef Iury Siqueira Ferreira and Lucas Rafael Gris and Augusto Seben da Rosa and Frederico Santos de Oliveira and Edresson Casanova and Rafael Teixeira Sousa and Arnaldo Candido Junior and Anderson da Silva Soares and Arlindo Galvão Filho},
-      year={2025},
-      eprint={2501.05586},
-      archivePrefix={arXiv},
-      primaryClass={cs.SD},
-      url={https://arxiv.org/abs/2501.05586},
-}
+@INPROCEEDINGS{10890068,
+  author={Ferreira, Alef Iury and Gris, Lucas Rafael and Da Rosa, Augusto and Oliveira, Frederico and Casanova, Edresson and Sousa, Rafael and Junior, Arnaldo and Soares, Anderson and Filho, Arlindo Galvão},
+  booktitle={ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)}, 
+  title={FreeSVC: Towards Zero-shot Multilingual Singing Voice Conversion}, 
+  year={2025},
+  volume={},
+  number={},
+  pages={1-5},
+  keywords={Training;Source coding;Zero shot learning;Refining;Signal processing;Data models;Acoustics;Multilingual;Data mining;Speech synthesis;Singing Voice Conversion;Synthesis of Singing Voices;Cross-lingual and multilingual aspects in speech synthesis},
+  doi={10.1109/ICASSP49660.2025.10890068}}
 ```
 
 ## Acknowledgements
