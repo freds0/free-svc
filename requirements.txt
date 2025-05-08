@@ -1,7 +1,7 @@
 glob2==0.7
 tqdm==4.62.3
 librosa==0.10.1
-scipy==1.7.2
+scipy>=1.10.0
 tensorboard==2.7.0
 webrtcvad==2.0.10
 colorlog==6.7.0
