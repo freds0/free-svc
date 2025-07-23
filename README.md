@@ -97,6 +97,9 @@ FreeSVC is trained on a diverse set of speech and singing datasets covering mult
     - **RMVPE Model:**
       - Download from [HuggingFace](https://huggingface.co/alefiury/free-svc/blob/main/rmvpe.pt)
       - Place the downloaded model in `models/f0_predictor/ckpt`
+  
+    - **Discriminator**:
+      - Download the discriminator from [FreeVC](https://github.com/OlaWod/FreeVC) named `D-freevc-24.pth` inside the `24kHz` folder, [here](https://1drv.ms/u/s!AnvukVnlQ3ZTx1rjrOZ2abCwuBAh?e=UlhRR5).
 
 6. **Install Dependencies:**
     ```bash
@@ -232,6 +235,7 @@ If you plan to use the pretrained models, please ensure that your use case compl
 
 - [**so-vits-svc**](https://github.com/svc-develop-team/so-vits-svc)
 - [**VITS Model**](https://github.com/jaywalnut310/vits)
+- [**FreeVC**](https://github.com/OlaWod/FreeVC)
 - [**HifiGAN**](https://github.com/jik876/hifi-gan)
 - [**ECAPA2 Speaker Encoder**](https://huggingface.co/Jenthe/ECAPA2)
 - [**WavLM**](https://github.com/microsoft/unilm/tree/master/wavlm)
